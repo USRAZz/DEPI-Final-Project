@@ -1,0 +1,9 @@
+# Container: M4 (Ziad). App shell: M1 (Karim). Feature folders are owned per CODEOWNERS.
+services:
+  frontend:
+    image: node:20-alpine
+    working_dir: /app
+    command: sh -c "npm install && npm run dev -- --host"
+    volumes: [./:/app]
+    ports: ["5173:5173"]
+    depends_on: [api]

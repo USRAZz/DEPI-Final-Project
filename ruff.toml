@@ -1,0 +1,5 @@
+line-length = 120
+target-version = "py311"
+[lint]
+select = ["E", "F", "I", "B", "UP"]
+ignore = ["E501", "UP042"]  # long lines OK in stubs; str+Enum kept for clarity

@@ -1,0 +1,9 @@
+# Service owner: M2 (Yossra). Container setup: M4 (Ziad). Only this file defines the 'agent' container.
+services:
+  agent:
+    build:
+      context: ../..
+      dockerfile: services/agent/Dockerfile
+    env_file: ../../.env
+    ports:
+      - "8001:8000"

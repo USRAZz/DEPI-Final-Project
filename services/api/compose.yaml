@@ -1,0 +1,14 @@
+# Service owner: M1 (Karim). Container setup: M4 (Ziad). Only this file defines the 'api' container.
+services:
+  api:
+    build:
+      context: ../..
+      dockerfile: services/api/Dockerfile
+    env_file: ../../.env
+    ports:
+      - "8000:8000"
+    depends_on:
+      - postgres
+      - agent
+      - gateway
+      - extractor
