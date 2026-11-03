@@ -1,0 +1,9 @@
+# Service owner: M4 (Ziad). Container setup: M4 (Ziad). Only this file defines the 'risk' container.
+services:
+  risk:
+    build:
+      context: ../..
+      dockerfile: services/risk/Dockerfile
+    env_file: ../../.env
+    ports:
+      - "8003:8000"

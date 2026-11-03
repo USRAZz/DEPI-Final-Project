@@ -1,0 +1,14 @@
+# Policy-as-code (owner: M3 Anan). Same file feeds the gateway and (stretch) the policy RAG.
+version: 0.1
+rules:
+  - id: PAY-001
+    description: Payments above 10,000 EGP need two different approvers
+    when: {tool: create_payment_request, amount_gt: 10000}
+    then: {decision: PENDING_APPROVAL, required_approvers: 2}
+  - id: PAY-002
+    description: Creator of a payment request can never approve it (maker-checker)
+    enforce: maker_checker
+  - id: VEN-001
+    description: Payments to a vendor with a pending IBAN change are held 48 hours
+    when: {vendor_iban_status: VENDOR_CHANGE_PENDING}
+    then: {decision: BLOCK, reason: vendor bank details pending verification}

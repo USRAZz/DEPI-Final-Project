@@ -1,0 +1,74 @@
+# Local secrets and machine-specific configuration. Keep the safe template.
+.env
+.env.*
+!.env.example
+!.env.*.example
+.venv/
+venv/
+env/
+secrets/
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa*
+
+# Internal planning and design documents stay outside the shared repository.
+/PLAN*.md
+/docs/
+/CONTRIBUTING.md
+# Keep runnable project and service README files available to teammates.
+**/README.md
+!/README.md
+!**/README.md
+*.docx
+*.pdf
+*.drawio
+*.drawio.png
+/.github/CODEOWNERS
+
+# Allow only reviewed, synthetic invoice PDFs needed as shared test fixtures.
+# Keep real invoices and unreviewed document samples outside Git.
+!tests/fixtures/synthetic/**/*.pdf
+
+# Python caches, virtual environments, and test output.
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.tox/
+.nox/
+.coverage
+coverage/
+htmlcov/
+
+# JavaScript dependencies and generated frontend builds.
+node_modules/
+dist/
+.next/
+*.tsbuildinfo
+
+# Logs, local databases, temporary files, and editor settings.
+*.log
+*.sqlite
+*.sqlite3
+*.db
+*.tmp
+*.bak
+*~
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# datasets & big artifacts never go in Git
+data/raw/
+data/processed/
+data/synthetic/
+services/risk/models/*.joblib
+*.ipynb_checkpoints
+build/
+*.egg-info/
+eval/results/
+eval/output/

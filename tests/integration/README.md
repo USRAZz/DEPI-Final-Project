@@ -1,0 +1,3 @@
+# Cross-component tests (T-01..T-18, SDD §12)
+Run by M1 twice a week against `dev` with the full stack up (`make up`). Each owner adds the test for their own scenario:
+`test_t01_extraction.py` (M2), `test_t04_viewer_denied.py` (M3), `test_t02_duplicate.py` (M4), `test_t05_low_risk_payment.py` (M1) …

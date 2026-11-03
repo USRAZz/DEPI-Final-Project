@@ -1,0 +1,53 @@
+name: CI
+on:
+  pull_request:
+  push:
+    branches: [main, dev]
+
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install ./contracts pytest ruff
+      - run: ruff check contracts
+      - run: cd contracts && pytest -q
+
+  services:
+    needs: contracts
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [api, agent, extractor, gateway, risk]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install ./contracts -r services/${{ matrix.service }}/requirements-dev.txt
+      - run: ruff check services/${{ matrix.service }}
+      - run: cd services/${{ matrix.service }} && pytest -q
+
+  migrations:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fail if Alembic has more than one head
+        run: |
+          dir=services/api/migrations/versions
+          [ -d "$dir" ] || { echo "no migrations yet"; exit 0; }
+          heads=$(grep -h "^down_revision" $dir/*.py | wc -l)
+          revs=$(grep -h "^revision" $dir/*.py | sed -E 's/.*= *["'\'']([^"'\'']+).*/\1/')
+          downs=$(grep -h "^down_revision" $dir/*.py | sed -E 's/.*= *["'\'']?([^"'\'']*)["'\'']?.*/\1/')
+          count=0; for r in $revs; do echo "$downs" | grep -qx "$r" || count=$((count+1)); done
+          echo "heads: $count"; [ "$count" -le 1 ]
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "20" }
+      - run: cd frontend && npm install && npm run build

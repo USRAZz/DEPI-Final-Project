@@ -1,0 +1,12 @@
+# Service owner: M3 (Anan). Container setup: M4 (Ziad). Only this file defines the 'gateway' container.
+services:
+  gateway:
+    build:
+      context: ../..
+      dockerfile: services/gateway/Dockerfile
+    env_file: ../../.env
+    ports:
+      - "8002:8000"
+    depends_on:
+      - postgres
+      - risk

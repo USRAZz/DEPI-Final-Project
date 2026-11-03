@@ -1,0 +1,17 @@
+"""Shared contracts for SecureFin AI. Every service imports types from here — never redefine them."""
+from .actions import ChatRequest, ChatResponse, ProposedAction, ToolName
+from .audit import AuditEntry, AuditEvent
+from .common import Decision, InvoiceStatus, RiskLevel, Role
+from .gateway import ApprovalRecord, ApprovalRequest, AuthorizeRequest, GatewayDecision
+from .invoice import InvoiceData, LineItem
+from .risk import RiskRequest, RiskScore, ShapReason
+
+__version__ = "0.1.0"
+__all__ = [
+    "Role", "Decision", "RiskLevel", "InvoiceStatus",
+    "LineItem", "InvoiceData",
+    "ToolName", "ProposedAction", "ChatRequest", "ChatResponse",
+    "AuthorizeRequest", "GatewayDecision", "ApprovalRequest", "ApprovalRecord",
+    "RiskRequest", "RiskScore", "ShapReason",
+    "AuditEvent", "AuditEntry",
+]

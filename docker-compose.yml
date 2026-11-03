@@ -1,0 +1,28 @@
+# Root compose (owner: M4 Ziad). Only include: lines + shared infra. Each owner edits their own services/<x>/compose.yaml.
+include:
+  - services/api/compose.yaml
+  - services/agent/compose.yaml
+  - services/gateway/compose.yaml
+  - services/risk/compose.yaml
+  - services/extractor/compose.yaml
+  - frontend/compose.yaml
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-securefin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-securefin}
+      POSTGRES_DB: ${POSTGRES_DB:-securefin}
+    ports: ["5432:5432"]
+    volumes: [pgdata:/var/lib/postgresql/data]
+
+  # Optional automation. Start with: docker compose --profile n8n up
+  n8n:
+    image: n8nio/n8n:latest
+    profiles: [n8n]
+    ports: ["5678:5678"]
+    volumes: [./n8n/workflows:/workflows]
+
+volumes:
+  pgdata:
