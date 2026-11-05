@@ -3,7 +3,7 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 
 from .actions import ProposedAction
-from .common import Decision, Role
+from .common import Contract, Decision, EgyptianIBAN, Money, Role
 
 
 class AuthorizeRequest(BaseModel):
@@ -28,6 +28,16 @@ class ApprovalRequest(BaseModel):
     approver_id: int
     approve: bool
     comment: str = Field(default="", max_length=500)
+
+
+class ApprovalPayload(Contract):
+    """Exactly what an approver signs. Changing the amount or the account breaks the signature."""
+
+    payment_request_id: int
+    money: Money
+    iban: EgyptianIBAN
+    approver_id: int
+    signed_at: datetime
 
 
 class ApprovalRecord(BaseModel):
