@@ -1,20 +1,20 @@
+import os
+import secrets
+
 from fastapi import FastAPI
-from securefin_contracts import AuthorizeRequest, Decision, ProposedAction, Role
 
-from .clients import gateway_authorize
-
-app = FastAPI(title="SecureFin API")
-
-
-@app.get("/health")
-def health():
-    return {"service": "api", "status": "ok"}
+from .gateway import Gateway, LocalGateway
+from .routes import router
+from .store import Store, seeded_store
 
 
-@app.post("/payments/propose")
-async def propose_payment(action: ProposedAction):
-    """Skeleton path: agent proposal -> gateway decision -> execute only on ALLOW. (Auth is stubbed.)"""
-    req = AuthorizeRequest(user_id=1, role=Role.ACCOUNTANT, company_id=1, action=action, request_id="demo-1")
-    decision = await gateway_authorize(req)
-    executed = decision.decision == Decision.ALLOW  # TODO(Karim): real simulated executor + HMAC re-check
-    return {"decision": decision.model_dump(), "executed": executed}
+def create_app(store: Store | None = None, gateway: Gateway | None = None) -> FastAPI:
+    app = FastAPI(title="SecureFin API")
+    app.state.store = store or seeded_store()
+    signing_key = os.environ.get("HMAC_SECRET", "").encode() or secrets.token_bytes(32)
+    app.state.gateway = gateway or LocalGateway(signing_key)
+    app.include_router(router)
+    return app
+
+
+app = create_app()
