@@ -1,5 +1,21 @@
 {
-  "appName": "سيكيور فين",
-  "welcome": "أهلًا بك في سيكيور فين.",
-  "switchLanguage": "English"
+  "appName": "SecureFin",
+  "menu": "القائمة الرئيسية",
+  "footer": "كل دفعة بتعدّي على البوابة قبل التنفيذ",
+  "switchLanguage": "English",
+  "company": "شركة الدلتا للتجارة",
+  "roles.admin": "مدير النظام",
+  "roles.approver": "معتمِد",
+  "roles.accountant": "محاسب",
+  "roles.viewer": "مشاهد",
+  "risk.high": "عالية",
+  "risk.medium": "متوسطة",
+  "risk.low": "منخفضة",
+  "banks.NBE": "البنك الأهلي المصري",
+  "banks.BM": "بنك مصر",
+  "banks.CIB": "البنك التجاري الدولي",
+  "loading": "جاري التحميل…",
+  "loadError": "حصلت مشكلة في تحميل البيانات.",
+  "notFound": "الصفحة دي مش موجودة.",
+  "backHome": "ارجع للوحة التحكم"
 }
