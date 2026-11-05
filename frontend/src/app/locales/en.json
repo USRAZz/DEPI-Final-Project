@@ -1,5 +1,21 @@
 {
   "appName": "SecureFin",
-  "welcome": "Welcome to SecureFin.",
-  "switchLanguage": "العربية"
+  "menu": "Main menu",
+  "footer": "Every payment passes the gateway before it runs",
+  "switchLanguage": "العربية",
+  "company": "Delta Trading Co.",
+  "roles.admin": "Admin",
+  "roles.approver": "Approver",
+  "roles.accountant": "Accountant",
+  "roles.viewer": "Viewer",
+  "risk.high": "High",
+  "risk.medium": "Medium",
+  "risk.low": "Low",
+  "banks.NBE": "National Bank of Egypt",
+  "banks.BM": "Banque Misr",
+  "banks.CIB": "Commercial International Bank",
+  "loading": "Loading…",
+  "loadError": "Something went wrong loading the data.",
+  "notFound": "This page does not exist.",
+  "backHome": "Back to the dashboard"
 }
