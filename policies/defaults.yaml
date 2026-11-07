@@ -1,0 +1,32 @@
+# SecureFin gateway: default policy values
+# Owner: Anan Alaa. Changes only by reviewed PR; others propose via issues.
+#
+# These are ASSUMPTIONS, not interview results. The project is an internship /
+# graduation project with no real client company, so the values follow common
+# practice (maker-checker, dual approval above a limit, cooling period after a
+# bank-detail change). Document them as assumptions in the report.
+# Every value is read from policy, never hard-coded in gateway code.
+
+version: 1
+
+approvals:
+  two_approver_threshold_egp: 10000   # amount at or above this needs 2 distinct approvers
+  creator_can_approve: false          # maker-checker: never configurable per company in MVP
+  approval_expiry_hours: 72           # signed approval is void after this
+
+bank_details:
+  change_hold_hours: 48               # vendor on HOLD after a bank-detail change
+  confirmation_required: true         # a second person must confirm the change
+
+risk:
+  hold_score: 0.7                     # score at or above this -> HOLD for finance manager review
+  on_risk_service_unavailable: hold   # RISK_UNAVAILABLE -> HOLD
+
+gateway:
+  timeout_ms: 2000                    # slower than this -> BLOCK (GATEWAY_UNAVAILABLE)
+  fail_mode: block                    # never fail open
+
+assistant:
+  can_execute: false
+  can_approve: false
+  max_steps: 10                       # matches the agent loop limit in the plan
