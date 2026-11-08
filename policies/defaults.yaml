@@ -15,12 +15,12 @@ approvals:
   approval_expiry_hours: 72           # signed approval is void after this
 
 bank_details:
-  change_hold_hours: 48               # vendor on HOLD after a bank-detail change
+  change_hold_hours: 48               # vendor payments held after a bank-detail change
   confirmation_required: true         # a second person must confirm the change
 
 risk:
-  hold_score: 0.7                     # score at or above this -> HOLD for finance manager review
-  on_risk_service_unavailable: hold   # RISK_UNAVAILABLE -> HOLD
+  hold_score: 70                      # risk score is 0-100 (RiskScore); at or above -> PENDING_APPROVAL
+  on_risk_service_unavailable: hold   # RISK_UNAVAILABLE -> PENDING_APPROVAL (or 'block')
 
 gateway:
   timeout_ms: 2000                    # slower than this -> BLOCK (GATEWAY_UNAVAILABLE)

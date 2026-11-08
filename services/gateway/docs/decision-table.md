@@ -2,8 +2,10 @@
 
 Owner: Anan Alaa. Status: draft v0.1.
 
+Outcomes are the shared `Decision` values from `securefin_contracts`: `ALLOW`, `PENDING_APPROVAL` and `BLOCK`. Reason codes below are returned as strings in `GatewayDecision.reasons`.
+
 ## How the pipeline runs
-Checks run in this order. The first BLOCK stops the pipeline. HOLD reasons are collected and returned together.
+Checks run in this order. The first BLOCK stops the pipeline. PENDING_APPROVAL reasons are collected and returned together.
 
 1. Authentication and request validity
 2. Role permission
@@ -29,11 +31,11 @@ A decision is always written to the audit log, whatever the outcome.
 | 8 | Payload mismatch | Payload hash differs from what was signed | BLOCK | `APPROVAL_PAYLOAD_MISMATCH` |
 | 9 | Approval expired | Approval older than the expiry limit | BLOCK | `APPROVAL_EXPIRED` |
 | 10 | Not enough approvals | Execute requested without required approvals | BLOCK | `APPROVALS_MISSING` |
-| 11 | Needs second approver | Amount at or above `two_approver_threshold` and fewer than 2 approvals | HOLD | `NEEDS_SECOND_APPROVER` |
-| 12 | Bank change cooling | Vendor bank details changed less than `bank_change_hold_hours` ago | HOLD | `BANK_CHANGE_COOLING` |
-| 13 | Bank change unconfirmed | Bank change not yet confirmed | HOLD | `BANK_CHANGE_UNCONFIRMED` |
-| 14 | High risk | Risk score at or above `risk_hold_score` | HOLD | `HIGH_RISK` |
-| 15 | Risk unavailable | Risk service did not answer | HOLD | `RISK_UNAVAILABLE` |
+| 11 | Needs second approver | Amount at or above `two_approver_threshold` and fewer than 2 approvals | PENDING_APPROVAL | `NEEDS_SECOND_APPROVER` |
+| 12 | Bank change cooling | Vendor bank details changed less than `bank_change_hold_hours` ago | PENDING_APPROVAL | `BANK_CHANGE_COOLING` |
+| 13 | Bank change unconfirmed | Bank change not yet confirmed | PENDING_APPROVAL | `BANK_CHANGE_UNCONFIRMED` |
+| 14 | High risk | Risk score at or above `risk_hold_score` | PENDING_APPROVAL | `HIGH_RISK` |
+| 15 | Risk unavailable | Risk service did not answer | PENDING_APPROVAL | `RISK_UNAVAILABLE` |
 | 16 | Gateway failure | Timeout or internal error | BLOCK | `GATEWAY_UNAVAILABLE` |
 | 17 | All checks pass | None of the above | ALLOW | `OK` |
 
@@ -44,7 +46,7 @@ A decision is always written to the audit log, whatever the outcome.
 | `two_approver_threshold` | EGP 10,000 |
 | `bank_change_hold_hours` | 48 |
 | `approval_expiry_hours` | 72 |
-| `risk_hold_score` | 0.7 |
+| `risk_hold_score` | 70 (risk score is 0 to 100, as in `RiskScore`) |
 
 These are assumptions (no real client), stored in `policies/defaults.yaml`. The loader refuses a policy that lets the gateway fail open, lets creators approve, or lets the assistant execute.
 
@@ -70,12 +72,13 @@ Note: "propose only" means the assistant's request is judged like a user's, usin
 - `confirm_bank_change` by the person who requested the change is blocked (`SELF_APPROVAL`).
 - Any approval whose payload hash differs from the current payment blocks execution, even if other approvals are valid.
 - Signature verification (not only the hash) is added in the signing step (weeks 6 to 7).
-- Rules 10 and 11 at execution: no valid approval at all is BLOCK (`APPROVALS_MISSING`, or `APPROVAL_EXPIRED` if only stale approvals exist). At least one valid approval but fewer than required is HOLD (`NEEDS_SECOND_APPROVER`).
+- Approval signature: HMAC-SHA256 with a server-side key, stored as `ApprovalRecord.hmac_signature`. It covers the approver, the decision and the exact payment details read from the database at signing time. At execution the gateway recomputes it, so any change to the amount, vendor, currency or bank account cancels the approval.
+- Rules 10 and 11 at execution: no valid approval at all is BLOCK (`APPROVALS_MISSING`, or `APPROVAL_EXPIRED` if only stale approvals exist). At least one valid approval but fewer than required is PENDING_APPROVAL (`NEEDS_SECOND_APPROVER`).
 - The gateway uses its own clock for expiry and hold periods. `requested_at` from the caller is never used for timing.
-- `change_vendor_bank_details` is never final: it always returns HOLD (rules 12 and 13) with `hold_until`. A second person releases it with `confirm_bank_change`.
+- `change_vendor_bank_details` is never final: it always returns PENDING_APPROVAL (rules 12 and 13) with `hold_until`. A second person releases it with `confirm_bank_change`.
 - `create_payment_request` must name the acting user as `created_by`. Otherwise the self-approval rule could be dodged later.
 - `execute_payment` needs the vendor's bank-detail state from the API. If it is missing the request is `INVALID_REQUEST`; the gateway does not guess.
 - Authentication is checked first, then request validity, then the role.
 
 ## Translation keys
-Each reason code maps to a key like `gateway.reason.SELF_APPROVAL`, with text in `ar.json` and `en.json`. The gateway returns keys, never text.
+Each reason code maps to a key like `gateway.reason.SELF_APPROVAL`, with text in `ar.json` and `en.json`. The gateway returns codes, never text.
