@@ -13,7 +13,7 @@ from .gateway import (
     PaymentRequestInfo,
 )
 from .invoice import InvoiceData, LineItem
-from .risk import RiskRequest, RiskScore, ShapReason
+from .risk import RiskFeatures, RiskRequest, RiskScore, ShapReason
 
 __version__ = "0.1.0"
 __all__ = [
@@ -22,6 +22,6 @@ __all__ = [
     "ToolName", "ProposedAction", "ChatRequest", "ChatResponse",
     "AuthorizeRequest", "GatewayDecision", "ApprovalRequest", "ApprovalRecord",
     "PaymentRequestInfo", "ApprovalResult", "ExecuteCheckRequest", "ExecuteCheckResult",
-    "RiskRequest", "RiskScore", "ShapReason",
+    "RiskFeatures", "RiskRequest", "RiskScore", "ShapReason",
     "AuditEvent", "AuditEntry",
 ]

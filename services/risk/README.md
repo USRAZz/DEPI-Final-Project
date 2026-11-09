@@ -6,6 +6,16 @@
 
 **Endpoints:** `/v1/score` (rules-only MVP implementation)
 
+## Where the features come from
+The gateway sends only `invoice_id`. The risk service then calls the api:
+
+`GET {API_URL}/v1/invoices/{id}/risk-features` with header `X-Service-Token: {INTERNAL_SERVICE_TOKEN}` → `RiskFeatures` (from `securefin_contracts`).
+
+- The api computes the facts (booleans and numbers only); raw bank details never leave the api.
+- If the call fails (api down, slower than `RISK_FEATURES_TIMEOUT_MS`, 401/404, bad body, token not set), `/v1/score` returns **503**. The gateway treats that as "risk unavailable" and holds the payment. It never falls back to a low score.
+- Features sent in the request body (`"features": {...}`) are scored as given and the api is not called. Use this for tests and manual checks.
+- Until the api serves this endpoint, every scored payment is held with "risk service unavailable".
+
 ## Current scoring behavior
 The endpoint scores only explicitly supplied `features` and returns stable rule codes. Supported input keys:
 
