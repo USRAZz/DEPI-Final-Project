@@ -40,3 +40,19 @@ Set `POLICY_DIR` to point at a different folder.
 - Score >= `risk.hold_score` (70) -> `PENDING_APPROVAL`, reason "high risk score"
 - Risk service down, slower than `gateway.timeout_ms`, or bad response -> `PENDING_APPROVAL`, reason "risk service unavailable" (fail closed, never ALLOW)
 - Address: env `RISK_URL`. Default `http://risk:8000` (Docker). Local run without Docker: `RISK_URL=http://localhost:8003`
+
+## Approvals
+
+`app/approvals.py` holds the approval rules as pure functions (no database, no web framework):
+
+- **Maker-checker:** the creator of a payment request can never approve it
+- Only roles in `approvals.approver_roles` (policy) may approve; company must match
+- One person decides once; any rejection stops the request
+- 1 approver, or 2 distinct approvers above EGP 10,000 or for any non-EGP amount
+- Every approval is signed (HMAC-SHA256) over the exact payment details (company, invoice, vendor, amount, currency) and the decision
+- Approvals and the payment request expire after `approvals.approval_expiry_hours` (72)
+- `execute_check` recomputes every signature from the current payment data; any change after approval means "not allowed"
+
+Signing key: env `APPROVAL_HMAC_KEY`, at least 32 bytes, never in Git. Generate one with
+`python -c "import secrets; print(secrets.token_hex(32))"`.
+The HTTP endpoints and the `approvals` table are added in the next PR.

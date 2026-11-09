@@ -113,3 +113,13 @@ def test_non_mapping_yaml_refused(pdir):
 def test_policy_dir_env_override(monkeypatch, pdir):
     monkeypatch.setenv("POLICY_DIR", str(pdir))
     assert find_policy_dir() == pdir
+
+
+def test_empty_approver_roles_refused(pdir):
+    _edit(pdir, "defaults.yaml", lambda d: d["approvals"].update(approver_roles=[]))
+    with pytest.raises(PolicyError):
+        load_gateway_policy(pdir)
+
+
+def test_approver_roles_from_file():
+    assert load_gateway_policy(REAL).defaults.approvals.approver_roles == {Role.APPROVER, Role.ADMIN}
