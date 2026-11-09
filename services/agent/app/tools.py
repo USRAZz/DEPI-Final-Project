@@ -35,21 +35,27 @@ def _filter(rows: list[dict], date_key: str, f: dict) -> list[dict]:
 
 
 class MockBackend:
+    # Integer ids, like the real api. vendor_id lets the assistant fill a valid create_payment_request proposal.
     INVOICES = [
-        {"id": "INV-001", "vendor_name": "Nile Office Supplies", "invoice_number": "A-1001", "invoice_date": "2026-10-03",
-         "total_amount": 12500.0, "currency": "EGP", "status": "READY", "category": "office_supplies"},
-        {"id": "INV-002", "vendor_name": "Delta Telecom", "invoice_number": "7781", "invoice_date": "2026-10-10",
+        {"id": 1, "vendor_id": 1, "vendor_name": "Nile Office Supplies", "invoice_number": "A-1001",
+         "invoice_date": "2026-10-03", "total_amount": 12500.0, "currency": "EGP", "status": "READY",
+         "category": "office_supplies"},
+        {"id": 2, "vendor_id": 2, "vendor_name": "Delta Telecom", "invoice_number": "7781", "invoice_date": "2026-10-10",
          "total_amount": 3400.0, "currency": "EGP", "status": "READY", "category": "utilities"},
-        {"id": "INV-003", "vendor_name": "Nile Office Supplies", "invoice_number": "A-1001", "invoice_date": "2026-10-12",
-         "total_amount": 12500.0, "currency": "EGP", "status": "FLAGGED", "category": "office_supplies"},
-        {"id": "INV-004", "vendor_name": "Cairo Cloud Hosting", "invoice_number": "CH-55", "invoice_date": "2026-09-28",
-         "total_amount": 48000.0, "currency": "EGP", "status": "READY", "category": "software"},
+        {"id": 3, "vendor_id": 1, "vendor_name": "Nile Office Supplies", "invoice_number": "A-1001",
+         "invoice_date": "2026-10-12", "total_amount": 12500.0, "currency": "EGP", "status": "FLAGGED",
+         "category": "office_supplies"},
+        {"id": 4, "vendor_id": 3, "vendor_name": "Cairo Cloud Hosting", "invoice_number": "CH-55",
+         "invoice_date": "2026-09-28", "total_amount": 48000.0, "currency": "EGP", "status": "READY",
+         "category": "software"},
     ]
     TRANSACTIONS = [
-        {"date": "2026-10-05", "invoice_id": "INV-001", "amount": 12500.0, "status": "paid"},
-        {"date": "2026-10-15", "invoice_id": "INV-002", "amount": 3400.0, "status": "paid"},
+        {"date": "2026-10-05", "invoice_id": 1, "amount": 12500.0, "status": "paid"},
+        {"date": "2026-10-15", "invoice_id": 2, "amount": 3400.0, "status": "paid"},
     ]
-    RISK = {"INV-003": {"score": 0.92, "level": "high", "reasons": ["Same vendor and invoice number as INV-001"]}}
+    # Same scale as the risk service: score 0-100.
+    RISK = {3: {"score": 70, "level": "high", "rule_hits": ["DUPLICATE_INVOICE"],
+                "reasons": ["Same vendor and invoice number as invoice 1"]}}
 
     def get_invoices(self, ctx: Context, filters: dict):
         return _filter(self.INVOICES, "invoice_date", filters)
@@ -58,7 +64,7 @@ class MockBackend:
         return _filter(self.TRANSACTIONS, "date", {"date_from": date_from, "date_to": date_to})
 
     def get_risk_score(self, ctx: Context, invoice_id: str):
-        return self.RISK.get(invoice_id, {"score": 0.1, "level": "low", "reasons": []})
+        return self.RISK.get(int(invoice_id), {"score": 0, "level": "low", "rule_hits": [], "reasons": []})
 
 
 class ApiBackend:
@@ -178,7 +184,7 @@ class ToolRegistry:
         self.add("search_policies", "Find company payment-policy rules (limits, approvals, holds) relevant to a question.",
                  {"query": "what you are looking for"}, lambda ctx, query: search_policies(query))
         self.add("get_risk_score", "Risk score and reasons for one invoice.",
-                 {"invoice_id": "e.g. INV-003"}, lambda ctx, invoice_id: b.get_risk_score(ctx, invoice_id))
+                 {"invoice_id": "integer invoice id, e.g. 3"}, lambda ctx, invoice_id: b.get_risk_score(ctx, invoice_id))
         self.add("calculate", "Safe calculator for arithmetic (no thousands separators).",
                  {"expression": "e.g. 12500 + 3400"}, lambda ctx, expression: {"result": calculate(expression)})
 

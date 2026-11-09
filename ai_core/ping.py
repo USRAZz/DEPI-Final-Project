@@ -1,5 +1,5 @@
-"""python -m ai_core.ping openrouter            -> list model ids your key can see
-   python -m ai_core.ping openrouter <model>    -> send one tiny request and show reply + time"""
+"""python -m ai_core.ping openai            -> list model ids your key can see
+   python -m ai_core.ping openai <model>    -> send one tiny request and show reply + time"""
 import sys
 import time
 

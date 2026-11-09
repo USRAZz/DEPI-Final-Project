@@ -55,14 +55,69 @@ def test_image_confidence_uses_the_engine_score(tmp_path, monkeypatch):
     img = tmp_path / "inv.png"
     Image.new("RGB", (20, 20), "white").save(img)
     monkeypatch.setenv("OCR_ENGINE", "tesseract")
-    monkeypatch.setitem(ocr.ENGINES, "tesseract", lambda im: "text")
-    monkeypatch.setitem(ocr.CONFIDENCE, "tesseract", lambda im: 0.42)
+    monkeypatch.setitem(ocr.ENGINES, "tesseract", lambda im: ("text", 0.42))
     assert ocr.extract_text_and_confidence(img) == ("text", 0.42)
 
 
-def test_engine_without_score_gives_none(tmp_path, monkeypatch):
+def test_paddleocr_is_the_default_engine(tmp_path, monkeypatch):
+    img = tmp_path / "inv.png"
+    Image.new("RGB", (20, 20), "white").save(img)
+    monkeypatch.delenv("OCR_ENGINE", raising=False)
+    monkeypatch.setitem(ocr.ENGINES, "paddleocr", lambda im: ("paddle text", 0.97))
+    assert ocr.extract_text_and_confidence(img) == ("paddle text", 0.97)
+
+
+def test_vision_engine_refused_without_explicit_opt_in(tmp_path, monkeypatch):
     img = tmp_path / "inv.png"
     Image.new("RGB", (20, 20), "white").save(img)
     monkeypatch.setenv("OCR_ENGINE", "vision")
-    monkeypatch.setitem(ocr.ENGINES, "vision", lambda im: "text")
-    assert ocr.extract_text_and_confidence(img) == ("text", None)
+    monkeypatch.delenv("OCR_VISION_ALLOW_UNMASKED", raising=False)
+    with pytest.raises(RuntimeError, match="unmasked"):
+        ocr.extract_text_and_confidence(img)
+
+
+def test_arabic_boxes_are_read_right_to_left_per_line():
+    # two words on one line (x left->right: "B" then "A") and one word on the next line
+    texts, boxes = ["B", "A", "C"], [[0, 0, 10, 10], [20, 0, 30, 10], [0, 30, 10, 40]]
+    assert ocr.order_boxes(texts, boxes, right_to_left=True) == ["A B", "C"]
+    assert ocr.order_boxes(texts, boxes, right_to_left=False) == ["B A", "C"]
+
+
+class CapturingLLM(FakeLLM):
+    def structured(self, messages, schema, *, retries=1, budget=None):
+        self.seen = messages
+        return super().structured(messages, schema, retries=retries, budget=budget)
+
+
+def test_iban_and_tax_id_are_read_by_code_and_never_sent_to_the_llm(tmp_path):
+    inv = tmp_path / "inv.txt"
+    inv.write_text("Nile Office invoice A-1 total 114 EGP\nTax Reg. No: 123-456-789\n"
+                   "IBAN: EG38 0019 0005 0000 0000 2631 8000 2\nPhone 01012345678", encoding="utf-8")
+    llm = CapturingLLM({**FIELDS, "iban": None})
+    r = pipeline.process_invoice(inv, llm_extract=llm, llm_categorize=FakeLLM(CATEGORY), seen={})
+    sent = llm.seen[-1]["content"]
+    assert "[IBAN]" in sent and "[TAX_ID]" in sent and "[PHONE]" in sent
+    assert "2631" not in sent and "123-456-789" not in sent and "01012345678" not in sent
+    assert r.fields.iban == "EG380019000500000000263180002" and r.fields.tax_id == "123456789"
+
+
+def test_paddle_output_is_merged_from_both_models(monkeypatch):
+    class Res:
+        def __init__(self, payload):
+            self.json = {"res": payload}
+
+    class Model:
+        def __init__(self, payload):
+            self.payload = payload
+
+        def predict(self, arr):
+            return [Res(self.payload)]
+
+    models = {
+        "ar": Model({"rec_texts": ["مصنع", "النيل"], "rec_scores": [0.9, 0.8],
+                     "rec_boxes": [[0, 0, 10, 10], [20, 0, 30, 10]]}),
+        "en": Model({"rec_texts": ["INV-1"], "rec_scores": [1.0], "rec_boxes": [[0, 20, 10, 30]]}),
+    }
+    monkeypatch.setattr(ocr, "_paddle_model", lambda lang: models[lang])
+    text, conf = ocr._paddle(Image.new("RGB", (40, 40), "white"))
+    assert text == "النيل مصنع\nINV-1" and conf == 0.9

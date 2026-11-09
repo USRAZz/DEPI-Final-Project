@@ -1,6 +1,5 @@
-"""Provider-agnostic LLM client.
-OpenAI, Gemini, Groq and xAI (Grok) all speak the OpenAI chat-completions protocol,
-so one client + a base_url preset covers them. Switch provider/model from .env only."""
+"""LLM client for the OpenAI chat-completions API. The model comes from .env.
+Every message is masked with ai_core.privacy before it leaves the process."""
 import json
 import os
 import time
@@ -9,15 +8,13 @@ from dataclasses import asdict, dataclass, field
 from dotenv import load_dotenv
 from openai import BadRequestError, NotFoundError, OpenAI, RateLimitError
 
+from .privacy import mask_messages
+
 load_dotenv()
 
+# Decision (SecureFin plan 1.2): OpenAI only. Every message is masked (ai_core.privacy) before it is sent.
 PROVIDERS = {
     "openai": {"base_url": None, "key_env": "OPENAI_API_KEY"},
-    "gemini": {"base_url": "https://generativelanguage.googleapis.com/v1beta/openai/", "key_env": "GEMINI_API_KEY"},
-    "groq": {"base_url": "https://api.groq.com/openai/v1", "key_env": "GROQ_API_KEY"},
-    "xai": {"base_url": "https://api.x.ai/v1", "key_env": "XAI_API_KEY"},
-    "openrouter": {"base_url": "https://openrouter.ai/api/v1", "key_env": "OPENROUTER_API_KEY"},
-    "custom": {"base_url": os.getenv("LLM_BASE_URL"), "key_env": "LLM_API_KEY"},  # any other OpenAI-compatible API
 }
 
 
@@ -115,7 +112,7 @@ class LLM:
     def chat(self, messages: list[dict], *, json_mode: bool = False, budget: Budget | None = None) -> str:
         if budget:
             budget.check()
-        kw = {"model": self.model, "messages": messages, self.opts["tokens_param"]: self.opts["max_tokens"]}
+        kw = {"model": self.model, "messages": mask_messages(messages), self.opts["tokens_param"]: self.opts["max_tokens"]}
         if self.opts["temperature"] is not None:
             kw["temperature"] = self.opts["temperature"]
         if json_mode and self.opts["json_mode"]:

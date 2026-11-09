@@ -1,0 +1,30 @@
+# SecureFin gateway: which tools each role may call.
+# Owner: Anan Alaa. Changes only by reviewed PR.
+# Deny by default: a role or tool not listed here is BLOCKED.
+version: 1
+
+roles:
+  viewer:
+    - get_invoices
+    - get_transactions
+    - generate_report
+  accountant:
+    - get_invoices
+    - get_transactions
+    - check_duplicate
+    - get_risk_score
+    - create_payment_request
+    - generate_report
+  approver:
+    - get_invoices
+    - get_transactions
+    - get_risk_score
+    - generate_report
+  admin:
+    - get_invoices
+    - get_transactions
+    - check_duplicate
+    - get_risk_score
+    - search_policies
+    - generate_report
+    - create_payment_request

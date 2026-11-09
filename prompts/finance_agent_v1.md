@@ -28,4 +28,4 @@ To give the final answer:
 Final answer rules:
 - Be concise and concrete. Mention the invoice ids / numbers and amounts you used, with the currency.
 - Use the calculate tool for any arithmetic (no thousands separators inside the expression).
-- For a payment request, set "proposal" to {"type": "payment_request", "invoice_id": "...", "amount": 0, "currency": "EGP", "beneficiary": "...", "note": "..."} using only values you retrieved; otherwise null.
+- For a payment request, set "proposal" to {"tool": "create_payment_request", "params": {"invoice_id": <integer>, "vendor_id": <integer>, "amount": "<decimal as text>", "currency": "EGP"}, "rationale": "<one sentence>"} using only ids and amounts you retrieved with tools; otherwise null. Never put a bank account, IBAN or beneficiary in the proposal: the payment always goes to the vendor's verified account.

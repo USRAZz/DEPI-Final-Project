@@ -1,17 +1,27 @@
 """Shared contracts for SecureFin AI. Every service imports types from here — never redefine them."""
 from .actions import ChatRequest, ChatResponse, ProposedAction, ToolName
 from .audit import AuditEntry, AuditEvent
-from .common import Decision, InvoiceStatus, RiskLevel, Role
-from .gateway import ApprovalRecord, ApprovalRequest, AuthorizeRequest, GatewayDecision
-from .invoice import InvoiceData, LineItem
-from .risk import RiskRequest, RiskScore, ShapReason
+from .common import ApprovalStatus, Decision, InvoiceStatus, RiskLevel, Role
+from .gateway import (
+    ApprovalRecord,
+    ApprovalRequest,
+    ApprovalResult,
+    AuthorizeRequest,
+    ExecuteCheckRequest,
+    ExecuteCheckResult,
+    GatewayDecision,
+    PaymentRequestInfo,
+)
+from .invoice import ExtractResponse, InvoiceData, LineItem
+from .risk import RiskFeatures, RiskRequest, RiskScore, ShapReason
 
 __version__ = "0.1.0"
 __all__ = [
-    "Role", "Decision", "RiskLevel", "InvoiceStatus",
-    "LineItem", "InvoiceData",
+    "Role", "Decision", "RiskLevel", "InvoiceStatus", "ApprovalStatus",
+    "LineItem", "InvoiceData", "ExtractResponse",
     "ToolName", "ProposedAction", "ChatRequest", "ChatResponse",
     "AuthorizeRequest", "GatewayDecision", "ApprovalRequest", "ApprovalRecord",
-    "RiskRequest", "RiskScore", "ShapReason",
+    "PaymentRequestInfo", "ApprovalResult", "ExecuteCheckRequest", "ExecuteCheckResult",
+    "RiskFeatures", "RiskRequest", "RiskScore", "ShapReason",
     "AuditEvent", "AuditEntry",
 ]
