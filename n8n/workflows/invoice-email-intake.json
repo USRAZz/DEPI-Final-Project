@@ -1,0 +1,103 @@
+{
+  "name": "Invoice email intake",
+  "nodes": [
+    {
+      "parameters": {
+        "mailbox": "INBOX",
+        "postProcessAction": "read",
+        "downloadAttachments": true,
+        "dataPropertyAttachmentsPrefixName": "attachment_",
+        "options": {
+          "customEmailConfig": "[\"UNSEEN\"]"
+        }
+      },
+      "id": "3d1f6b8e-1a2b-4c3d-9e01-000000000001",
+      "name": "New invoice email",
+      "type": "n8n-nodes-base.emailReadImap",
+      "typeVersion": 2,
+      "position": [0, 0],
+      "credentials": {
+        "imap": { "id": "invoice-inbox", "name": "Invoice inbox (IMAP)" }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// One item per invoice attachment, same type list as the extractor. The 10 MB limit is enforced by the API/extractor (HTTP 413).\nconst ALLOWED = ['pdf', 'png', 'jpg', 'jpeg', 'webp', 'tif', 'tiff'];\nconst out = [];\nfor (const item of $input.all()) {\n  const from = item.json.from?.value?.[0]?.address ?? '';\n  for (const bin of Object.values(item.binary ?? {})) {\n    const ext = (bin.fileExtension || (bin.fileName || '').split('.').pop() || '').toLowerCase();\n    if (!ALLOWED.includes(ext)) continue;\n    out.push({ json: { from, subject: item.json.subject ?? '', file_name: bin.fileName }, binary: { file: bin } });\n  }\n}\nreturn out;"
+      },
+      "id": "3d1f6b8e-1a2b-4c3d-9e01-000000000002",
+      "name": "Keep invoice attachments",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [240, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.N8N_INVOICE_UPLOAD_URL }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-Service-Token", "value": "={{ $env.INTERNAL_SERVICE_TOKEN }}" },
+            { "name": "X-Company-Id", "value": "={{ $env.N8N_COMPANY_ID }}" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            { "parameterType": "formBinaryData", "name": "file", "inputDataFieldName": "file" },
+            { "name": "source", "value": "email" },
+            { "name": "sender", "value": "={{ $json.from }}" }
+          ]
+        },
+        "options": {
+          "timeout": 120000,
+          "response": { "response": { "neverError": true, "fullResponse": true } }
+        }
+      },
+      "id": "3d1f6b8e-1a2b-4c3d-9e01-000000000003",
+      "name": "Upload to API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 0]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "typeValidation": "loose" },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.statusCode }}",
+              "rightValue": 300,
+              "operator": { "type": "number", "operation": "lt" }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "3d1f6b8e-1a2b-4c3d-9e01-000000000004",
+      "name": "Uploaded?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [720, 0]
+    },
+    {
+      "parameters": {
+        "errorMessage": "={{ 'Invoice upload failed: HTTP ' + $json.statusCode + ' for ' + $('Keep invoice attachments').item.json.file_name }}"
+      },
+      "id": "3d1f6b8e-1a2b-4c3d-9e01-000000000005",
+      "name": "Fail the run",
+      "type": "n8n-nodes-base.stopAndError",
+      "typeVersion": 1,
+      "position": [960, 120]
+    }
+  ],
+  "connections": {
+    "New invoice email": { "main": [[{ "node": "Keep invoice attachments", "type": "main", "index": 0 }]] },
+    "Keep invoice attachments": { "main": [[{ "node": "Upload to API", "type": "main", "index": 0 }]] },
+    "Upload to API": { "main": [[{ "node": "Uploaded?", "type": "main", "index": 0 }]] },
+    "Uploaded?": { "main": [[], [{ "node": "Fail the run", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "active": false
+}

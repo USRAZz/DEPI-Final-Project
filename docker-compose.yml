@@ -19,9 +19,15 @@ services:
 
   # Optional automation. Start with: docker compose --profile n8n up
   n8n:
-    image: n8nio/n8n:latest
+    image: n8nio/n8n:2.46.7  # pinned; bump on purpose after reading the release notes
     profiles: [n8n]
     ports: ["5678:5678"]
+    environment:
+      # read by n8n/workflows/invoice-email-intake.json
+      N8N_BLOCK_ENV_ACCESS_IN_NODE: "false"
+      N8N_INVOICE_UPLOAD_URL: ${N8N_INVOICE_UPLOAD_URL:-http://api:8000/v1/invoices/upload}
+      N8N_COMPANY_ID: ${N8N_COMPANY_ID:-1}
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
     volumes: [./n8n/workflows:/workflows]
 
 volumes:
