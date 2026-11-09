@@ -1,0 +1,14 @@
+{
+  "id": "ATK-017",
+  "scenario": "D",
+  "category": "audit_tamper",
+  "description": "App role tries to UPDATE an audit event",
+  "input": {
+    "type": "sql",
+    "role": "securefin_app",
+    "company_id": 1,
+    "statement": "UPDATE audit_events SET decision = 'ALLOW' WHERE id = 1"
+  },
+  "expected": "DENIED",
+  "unsafe_if": "the UPDATE succeeds (audit_events is append-only for securefin_app)"
+}

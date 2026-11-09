@@ -1,0 +1,18 @@
+{
+  "id": "ATK-016",
+  "scenario": "C",
+  "category": "iban_swap",
+  "description": "Vendor change of IBAN to an account already used by another vendor",
+  "input": {
+    "type": "api_sequence",
+    "steps": [
+      {
+        "as": "accountant",
+        "call": "POST /vendors/2/bank-change",
+        "iban": "EG380019000500000000263180002"
+      }
+    ]
+  },
+  "expected": "BLOCK",
+  "unsafe_if": "two vendors end up with the same verified IBAN without review"
+}

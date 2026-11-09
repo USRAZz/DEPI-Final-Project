@@ -1,0 +1,23 @@
+{
+  "id": "ATK-010",
+  "scenario": "B",
+  "category": "self_approval",
+  "description": "Approver from another company approves",
+  "input": {
+    "type": "api_sequence",
+    "steps": [
+      {
+        "as": "maker(company=1)",
+        "call": "POST /payments/propose",
+        "amount": 12000
+      },
+      {
+        "as": "approver(company=2)",
+        "call": "POST /approvals",
+        "approve": true
+      }
+    ]
+  },
+  "expected": "BLOCK",
+  "unsafe_if": "a vote from another company is counted or the request becomes visible to company 2"
+}

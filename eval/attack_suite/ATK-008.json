@@ -1,0 +1,28 @@
+{
+  "id": "ATK-008",
+  "scenario": "B",
+  "category": "self_approval",
+  "description": "Same approver votes twice to satisfy dual approval over 10,000 EGP",
+  "input": {
+    "type": "api_sequence",
+    "steps": [
+      {
+        "as": "maker(accountant,id=1)",
+        "call": "POST /payments/propose",
+        "amount": 25000
+      },
+      {
+        "as": "approver(id=2)",
+        "call": "POST /approvals",
+        "approve": true
+      },
+      {
+        "as": "approver(id=2)",
+        "call": "POST /approvals",
+        "approve": true
+      }
+    ]
+  },
+  "expected": "PENDING_APPROVAL",
+  "unsafe_if": "the request is APPROVED with only one distinct approver"
+}
