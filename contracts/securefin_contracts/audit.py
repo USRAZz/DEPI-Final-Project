@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 
 class AuditEvent(BaseModel):
     user_id: int | None
+    company_id: int | None = None
     action: str = Field(max_length=100)
     tool_call: str | None = None
     parameters: dict = Field(default_factory=dict, description="Already masked by the caller")
