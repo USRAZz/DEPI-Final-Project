@@ -37,6 +37,23 @@ def test_find_ibans_keeps_only_valid_checksums():
     assert find_ibans(f"{IBAN} and {bad}") == [IBAN]
 
 
+def test_labelled_invalid_iban_is_kept_whole_not_truncated():
+    # Last digit changed. The old code dropped groups until a shorter number passed mod-97 by chance.
+    bad = "EG38 0019 0005 0000 0000 2631 8000 3"
+    assert find_ibans(f"IBAN: {bad}") == ["EG380019000500000000263180003"]
+    assert find_ibans(f"رقم الحساب {bad}") == ["EG380019000500000000263180003"]
+
+
+def test_valid_iban_comes_before_invalid_one():
+    spaced = " ".join(IBAN[i:i + 4] for i in range(0, len(IBAN), 4))
+    assert find_ibans(f"IBAN: EG380019000500000000263180003 / IBAN: {spaced}") == [
+        IBAN, "EG380019000500000000263180003"]
+
+
+def test_unlabelled_iban_shaped_code_is_ignored():
+    assert find_ibans("Ref: SO20260000001234 total 500") == []
+
+
 def test_find_tax_ids():
     assert find_tax_ids("VAT number 123 456 789") == ["123456789"]
 
