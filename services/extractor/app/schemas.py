@@ -101,6 +101,10 @@ class ExtractionResult(BaseModel):
     fields: InvoiceFields | None = None
     category: CategoryResult | None = None
     issues: list[str] = Field(default_factory=list)
+    # Stable codes (TOTAL_MISMATCH, ...) for the api to store with the invoice; the risk service reads them.
+    issue_codes: list[str] = Field(default_factory=list)
+    # Mean OCR engine confidence 0-1 over OCR'd pages; None when no OCR ran or the engine gives no score.
+    ocr_confidence: float | None = Field(default=None, ge=0, le=1)
     duplicate_of: str | None = None
     ocr_chars: int = 0
     usage: dict = Field(default_factory=dict)

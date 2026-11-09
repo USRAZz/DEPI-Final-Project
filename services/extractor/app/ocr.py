@@ -10,6 +10,16 @@ def _tesseract(img) -> str:
     return pytesseract.image_to_string(img, lang=os.getenv("TESSERACT_LANG", "ara+eng"))
 
 
+def _tesseract_confidence(img) -> float | None:
+    """Mean word confidence (0-1) from Tesseract. A second pass over the same image, kept separate so the
+    text above is byte-for-byte what it was. None when no word was recognised."""
+    import pytesseract
+    data = pytesseract.image_to_data(img, lang=os.getenv("TESSERACT_LANG", "ara+eng"),
+                                     output_type=pytesseract.Output.DICT)
+    scores = [float(c) for c, w in zip(data["conf"], data["text"], strict=False) if float(c) >= 0 and str(w).strip()]
+    return round(sum(scores) / len(scores) / 100, 3) if scores else None
+
+
 def _vision(img) -> str:
     """OCR-by-LLM: a vision model transcribes the image to plain text, then the normal pipeline continues."""
     import base64
@@ -32,9 +42,11 @@ def _vision(img) -> str:
 
 # engine name -> function(PIL image) -> text
 ENGINES = {"tesseract": _tesseract, "vision": _vision}
+# engine name -> function(PIL image) -> confidence 0-1 (engines without a score are simply absent)
+CONFIDENCE = {"tesseract": _tesseract_confidence}
 
 
-def _pdf(path: Path, ocr) -> str:
+def _pdf(path: Path, ocr, scores: list[float] | None = None, confidence=None) -> str:
     import fitz  # PyMuPDF
     from PIL import Image
     pages = []
@@ -43,7 +55,12 @@ def _pdf(path: Path, ocr) -> str:
             text = page.get_text().strip()
             if len(text) < 20:  # scanned page: render it, then OCR
                 pix = page.get_pixmap(dpi=200)
-                text = ocr(Image.frombytes("RGB", [pix.width, pix.height], pix.samples))
+                img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+                text = ocr(img)
+                if scores is not None and confidence is not None:
+                    score = confidence(img)
+                    if score is not None:
+                        scores.append(score)
             pages.append(text)
     return "\n".join(pages)
 
@@ -61,3 +78,23 @@ def extract_text(path) -> str:
         return _pdf(p, ocr)
     from PIL import Image
     return ocr(Image.open(p))
+
+
+def extract_text_and_confidence(path) -> tuple[str, float | None]:
+    """Same text as extract_text, plus the OCR engine's mean confidence (0-1) over the pages it had to OCR.
+    None when no page needed OCR (text layer or .txt) or the engine gives no score."""
+    p = Path(path)
+    ext = p.suffix.lower()
+    if ext in (".txt", ".md"):
+        return p.read_text(encoding="utf-8"), None
+    name = os.getenv("OCR_ENGINE", "tesseract")
+    if name not in ENGINES:
+        raise ValueError(f"unknown OCR_ENGINE '{name}'. Available: {list(ENGINES)}")
+    ocr, confidence = ENGINES[name], CONFIDENCE.get(name)
+    if ext == ".pdf":
+        scores: list[float] = []
+        text = _pdf(p, ocr, scores, confidence)
+        return text, (round(sum(scores) / len(scores), 3) if scores else None)
+    from PIL import Image
+    img = Image.open(p)
+    return ocr(img), (confidence(img) if confidence else None)

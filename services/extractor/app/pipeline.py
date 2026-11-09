@@ -10,7 +10,7 @@ from pathlib import Path
 from ai_core.llm import Budget, BudgetExceeded, StructuredOutputError, get_llm
 from ai_core.prompts import load_prompt, untrusted
 
-from .ocr import extract_text
+from .ocr import extract_text_and_confidence
 from .schemas import CATEGORIES, CategoryResult, ExtractionResult, InvoiceFields
 
 _SEEN: dict[str, str] = {}  # in-memory duplicate memory for local tests; Ziad's risk service replaces it
@@ -23,22 +23,40 @@ def _iban_ok(iban: str) -> bool:
     return int("".join(str(int(c, 36)) for c in s[4:] + s[:4])) % 97 == 1
 
 
-def check_fields(f: InvoiceFields) -> list[str]:
-    """GATE 1: business sanity checks on the extracted fields."""
-    issues = []
+# Stable issue codes (stored with the invoice and used by the risk service) and their readable messages.
+ISSUE_MESSAGES = {
+    "NON_POSITIVE_TOTAL": "total is not positive",
+    "TOTAL_MISMATCH": "subtotal + tax does not equal total",
+    "LINE_ITEMS_MISMATCH": "line items do not add up to subtotal",
+    "DUE_BEFORE_INVOICE": "due date is before invoice date",
+    "IBAN_CHECKSUM_INVALID": "IBAN checksum is invalid",
+    "LOW_CATEGORY_CONFIDENCE": "low-confidence category",
+    "CATEGORIZATION_FAILED": "categorization failed",
+    "POSSIBLE_DUPLICATE": "possible duplicate",
+}
+
+
+def check_field_codes(f: InvoiceFields) -> list[str]:
+    """GATE 1: business sanity checks on the extracted fields, as stable codes."""
+    codes = []
     tol = max(1.0, abs(f.total_amount) * 0.005)
     if f.total_amount <= 0:
-        issues.append("total is not positive")
+        codes.append("NON_POSITIVE_TOTAL")
     if f.subtotal is not None and f.tax_amount is not None and abs(f.subtotal + f.tax_amount - f.total_amount) > tol:
-        issues.append("subtotal + tax does not equal total")
+        codes.append("TOTAL_MISMATCH")
     items = [i.total for i in f.line_items if i.total is not None]
     if items and f.subtotal is not None and abs(sum(items) - f.subtotal) > tol:
-        issues.append("line items do not add up to subtotal")
+        codes.append("LINE_ITEMS_MISMATCH")
     if f.invoice_date and f.due_date and f.due_date < f.invoice_date:
-        issues.append("due date is before invoice date")
+        codes.append("DUE_BEFORE_INVOICE")
     if f.iban and not _iban_ok(f.iban):
-        issues.append("IBAN checksum is invalid")
-    return issues
+        codes.append("IBAN_CHECKSUM_INVALID")
+    return codes
+
+
+def check_fields(f: InvoiceFields) -> list[str]:
+    """GATE 1 as readable messages (same text as before)."""
+    return [ISSUE_MESSAGES[c] for c in check_field_codes(f)]
 
 
 def _dup_key(f: InvoiceFields) -> str:
@@ -58,7 +76,7 @@ def process_invoice(path, *, invoice_id: str | None = None, llm_extract=None, ll
 
     # 1) OCR: plain code
     try:
-        text = extract_text(path)
+        text, ocr_confidence = extract_text_and_confidence(path)
     except Exception as e:
         return result("FAILED", issues=[f"OCR failed: {e}"])
     if len(text.strip()) < 20:
@@ -75,7 +93,8 @@ def process_invoice(path, *, invoice_id: str | None = None, llm_extract=None, ll
         return result("FAILED", issues=[f"extraction failed: {e}"], ocr_chars=len(text))
 
     # 3) GATE 1: checks in code
-    issues = check_fields(fields)
+    codes = check_field_codes(fields)
+    issues = [ISSUE_MESSAGES[c] for c in codes]
 
     # 4) LLM 2: sees only the validated fields, never the raw text
     llm_categorize = llm_categorize or get_llm("categorizer")
@@ -88,18 +107,21 @@ def process_invoice(path, *, invoice_id: str | None = None, llm_extract=None, ll
                                               {"role": "user", "content": untrusted(json.dumps(summary, ensure_ascii=False))}],
                                              CategoryResult, budget=budget)
         if category.confidence < 0.5:
-            issues.append("low-confidence category")
+            codes.append("LOW_CATEGORY_CONFIDENCE")
+            issues.append(ISSUE_MESSAGES["LOW_CATEGORY_CONFIDENCE"])
     except (StructuredOutputError, BudgetExceeded) as e:
         category = None
-        issues.append(f"categorization failed: {e}")
+        codes.append("CATEGORIZATION_FAILED")
+        issues.append(f"{ISSUE_MESSAGES['CATEGORIZATION_FAILED']}: {e}")
 
     # 5) GATE 2: duplicate check
     key = _dup_key(fields)
     dup = seen.get(key)
     if dup:
-        issues.append(f"possible duplicate of {dup}")
+        codes.append("POSSIBLE_DUPLICATE")
+        issues.append(f"{ISSUE_MESSAGES['POSSIBLE_DUPLICATE']} of {dup}")
     else:
         seen[key] = invoice_id or Path(path).name
 
     return result("FLAGGED" if issues else "READY", fields=fields, category=category, issues=issues,
-                  duplicate_of=dup, ocr_chars=len(text))
+                  issue_codes=codes, ocr_confidence=ocr_confidence, duplicate_of=dup, ocr_chars=len(text))
