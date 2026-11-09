@@ -31,7 +31,7 @@ A decision is always written to the audit log, whatever the outcome.
 | 8 | Payload mismatch | Payload hash differs from what was signed | BLOCK | `APPROVAL_PAYLOAD_MISMATCH` |
 | 9 | Approval expired | Approval older than the expiry limit | BLOCK | `APPROVAL_EXPIRED` |
 | 10 | Not enough approvals | Execute requested without required approvals | BLOCK | `APPROVALS_MISSING` |
-| 11 | Needs second approver | Amount at or above `two_approver_threshold` and fewer than 2 approvals | PENDING_APPROVAL | `NEEDS_SECOND_APPROVER` |
+| 11 | Needs second approver | Amount above `two_approver_threshold` (strictly; non-EGP always counts as above) and fewer than 2 approvals | PENDING_APPROVAL | `NEEDS_SECOND_APPROVER` |
 | 12 | Bank change cooling | Vendor bank details changed less than `bank_change_hold_hours` ago | PENDING_APPROVAL | `BANK_CHANGE_COOLING` |
 | 13 | Bank change unconfirmed | Bank change not yet confirmed | PENDING_APPROVAL | `BANK_CHANGE_UNCONFIRMED` |
 | 14 | High risk | Risk score at or above `risk_hold_score` | PENDING_APPROVAL | `HIGH_RISK` |

@@ -1,0 +1,943 @@
+{
+  "dataset": "SecureFin Varied Synthetic Invoice OCR Set - Batch 3",
+  "version": "1.0",
+  "count": 20,
+  "synthetic_only": true,
+  "license": "CC0-1.0",
+  "languages": {
+    "ar": 7,
+    "en": 7,
+    "mixed": 6
+  },
+  "quality_tiers": {
+    "clean": 20,
+    "moderate": 0,
+    "hard": 0
+  },
+  "layout_count": 10,
+  "notes": "All pages are clean, full-resolution renders with no blur, skew, contrast reduction, downsampling, or JPEG compression.",
+  "records": [
+    {
+      "id": "STRESS3-001",
+      "file": "STRESS3-001.pdf",
+      "language": "ar",
+      "layout_variant": 0,
+      "quality_tier": "clean",
+      "simulated_rotation_degrees": 0,
+      "vendor_name_ar": "شركة النور للمستلزمات",
+      "vendor_name_en": "Al Nour Supplies",
+      "invoice_number": "SYN3-2026001",
+      "invoice_date": "2026-08-01",
+      "purchase_order": "PO-342000",
+      "tax_id": "SYNTH-REG-018333",
+      "currency": "EGP",
+      "line_items": [
+        {
+          "description_ar": "أجهزة مكتبية",
+          "description_en": "Office equipment",
+          "quantity": 1,
+          "unit_price_egp": 1650,
+          "line_total_egp": 1650
+        },
+        {
+          "description_ar": "صيانة دورية",
+          "description_en": "Scheduled maintenance",
+          "quantity": 2,
+          "unit_price_egp": 1350,
+          "line_total_egp": 2700
+        }
+      ],
+      "subtotal_egp": 4350,
+      "tax_rate": 0.14,
+      "tax_egp": 609.0,
+      "total_egp": 4959.0,
+      "invoice_iban": "EG00TEST211923333309",
+      "synthetic_only": true
+    },
+    {
+      "id": "STRESS3-002",
+      "file": "STRESS3-002.pdf",
+      "language": "en",
+      "layout_variant": 1,
+      "quality_tier": "clean",
+      "simulated_rotation_degrees": 0,
+      "vendor_name_ar": "مركز الإتقان للصيانة",
+      "vendor_name_en": "Etqan Maintenance Center",
+      "invoice_number": "SYN3-2026002",
+      "invoice_date": "2026-08-03",
+      "purchase_order": "PO-342001",
+      "tax_id": "SYNTH-REG-021825",
+      "currency": "EGP",
+      "line_items": [
+        {
+          "description_ar": "مستلزمات كهربائية",
+          "description_en": "Electrical supplies",
+          "quantity": 3,
+          "unit_price_egp": 420,
+          "line_total_egp": 1260
+        },
+        {
+          "description_ar": "خدمات شحن",
+          "description_en": "Shipping services",
+          "quantity": 4,
+          "unit_price_egp": 1140,
+          "line_total_egp": 4560
+        }
+      ],
+      "subtotal_egp": 5820,
+      "tax_rate": 0.14,
+      "tax_egp": 814.8,
+      "total_egp": 6634.8,
+      "invoice_iban": "EG00TEST252208271577",
+      "synthetic_only": true
+    },
+    {
+      "id": "STRESS3-003",
+      "file": "STRESS3-003.pdf",
+      "language": "mixed",
+      "layout_variant": 2,
+      "quality_tier": "clean",
+      "simulated_rotation_degrees": 0,
+      "vendor_name_ar": "شركة المرسى للخدمات",
+      "vendor_name_en": "Al Marsa Services",
+      "invoice_number": "SYN3-2026003",
+      "invoice_date": "2026-08-05",
+      "purchase_order": "PO-342002",
+      "tax_id": "SYNTH-REG-025317",
+      "currency": "EGP",
+      "line_items": [
+        {
+          "description_ar": "مواد خام",
+          "description_en": "Raw materials",
+          "quantity": 5,
+          "unit_price_egp": 275,
+          "line_total_egp": 1375
+        },
+        {
+          "description_ar": "مستلزمات مكتبية",
+          "description_en": "Stationery items",
+          "quantity": 6,
+          "unit_price_egp": 195,
+          "line_total_egp": 1170
+        },
+        {
+          "description_ar": "أجهزة مكتبية",
+          "description_en": "Office equipment",
+          "quantity": 7,
+          "unit_price_egp": 1650,
+          "line_total_egp": 11550
+        }
+      ],
+      "subtotal_egp": 14095,
+      "tax_rate": 0.14,
+      "tax_egp": 1973.3,
+      "total_egp": 16068.3,
+      "invoice_iban": "EG00TEST292493209845",
+      "synthetic_only": true
+    },
+    {
+      "id": "STRESS3-004",
+      "file": "STRESS3-004.pdf",
+      "language": "ar",
+      "layout_variant": 3,
+      "quality_tier": "clean",
+      "simulated_rotation_degrees": 0,
+      "vendor_name_ar": "المنارة للتجهيزات",
+      "vendor_name_en": "Al Manara Equipment",
+      "invoice_number": "SYN3-2026004",
+      "invoice_date": "2026-08-07",
+      "purchase_order": "PO-342003",
+      "tax_id": "SYNTH-REG-020079",
+      "currency": "EGP",
+      "line_items": [
+        {
+          "description_ar": "تراخيص برامج",
+          "description_en": "Software licenses",
+          "quantity": 7,
+          "unit_price_egp": 1950,
+          "line_total_egp": 13650
+        },
+        {
+          "description_ar": "معدات وقاية",
+          "description_en": "Protective equipment",
+          "quantity": 8,
+          "unit_price_egp": 360,
+          "line_total_egp": 2880
+        },
+        {
+          "description_ar": "مستلزمات كهربائية",
+          "description_en": "Electrical supplies",
+          "quantity": 1,
+          "unit_price_egp": 420,
+          "line_total_egp": 420
+        }
+      ],
+      "subtotal_egp": 16950,
+      "tax_rate": 0.14,
+      "tax_egp": 2373.0,
+      "total_egp": 19323.0,
+      "invoice_iban": "EG00TEST232065802443",
+      "synthetic_only": true
+    },
+    {
+      "id": "STRESS3-005",
+      "file": "STRESS3-005.pdf",
+      "language": "en",
+      "layout_variant": 4,
+      "quality_tier": "clean",
+      "simulated_rotation_degrees": 0,
+      "vendor_name_ar": "مصنع الروابي",
+      "vendor_name_en": "Rawabi Factory",
+      "invoice_number": "SYN3-2026005",
+      "invoice_date": "2026-08-09",
+      "purchase_order": "PO-342004",
+      "tax_id": "SYNTH-REG-023571",
+      "currency": "EGP",
+      "line_items": [
+        {
+          "description_ar": "خدمة تركيب أجهزة",
+          "description_en": "Equipment installation",
+          "quantity": 1,
+          "unit_price_egp": 1750,
+          "line_total_egp": 1750
+        },
+        {
+          "description_ar": "خدمة دعم فني",
+          "description_en": "Technical support",
+          "quantity": 2,
+          "unit_price_egp": 890,
+          "line_total_egp": 1780
+        },
+        {
+          "description_ar": "مواد خام",
+          "description_en": "Raw materials",
+          "quantity": 3,
+          "unit_price_egp": 275,
+          "line_total_egp": 825
+        },
+        {
+          "description_ar": "مستلزمات مكتبية",
+          "description_en": "Stationery items",
+          "quantity": 4,
+          "unit_price_egp": 195,
+          "line_total_egp": 780
+        }
+      ],
+      "subtotal_egp": 5135,
+      "tax_rate": 0.14,
+      "tax_egp": 718.9,
+      "total_egp": 5853.9,
+      "invoice_iban": "EG00TEST272350740711",
+      "synthetic_only": true
+    },
+    {
+      "id": "STRESS3-006",
+      "file": "STRESS3-006.pdf",
+      "language": "mixed",
+      "layout_variant": 5,
+      "quality_tier": "clean",
+      "simulated_rotation_degrees": 0,
+      "vendor_name_ar": "شركة النور للمستلزمات",
+      "vendor_name_en": "Al Nour Supplies",
+      "invoice_number": "SYN3-2026006",
+      "invoice_date": "2026-08-11",
+      "purchase_order": "PO-342005",
+      "tax_id": "SYNTH-REG-018333",
+      "currency": "EGP",
+      "line_items": [
+        {
+          "description_ar": "أجهزة مكتبية",
+          "description_en": "Office equipment",
+          "quantity": 3,
+          "unit_price_egp": 1650,
+          "line_total_egp": 4950
+        },
+        {
+          "description_ar": "صيانة دورية",
+          "description_en": "Scheduled maintenance",
+          "quantity": 4,
+          "unit_price_egp": 1350,
+          "line_total_egp": 5400
+        },
+        {
+          "description_ar": "تراخيص برامج",
+          "description_en": "Software licenses",
+          "quantity": 5,
+          "unit_price_egp": 1950,
+          "line_total_egp": 9750
+        },
+        {
+          "description_ar": "معدات وقاية",
+          "description_en": "Protective equipment",
+          "quantity": 6,
+          "unit_price_egp": 360,
+          "line_total_egp": 2160
+        }
+      ],
+      "subtotal_egp": 22260,
+      "tax_rate": 0.14,
+      "tax_egp": 3116.4,
+      "total_egp": 25376.4,
+      "invoice_iban": "EG00TEST211923333309",
+      "synthetic_only": true
+    },
+    {
+      "id": "STRESS3-007",
+      "file": "STRESS3-007.pdf",
+      "language": "ar",
+      "layout_variant": 6,
+      "quality_tier": "clean",
+      "simulated_rotation_degrees": 0,
+      "vendor_name_ar": "مركز الإتقان للصيانة",
+      "vendor_name_en": "Etqan Maintenance Center",
+      "invoice_number": "SYN3-2026007",
+      "invoice_date": "2026-08-13",
+      "purchase_order": "PO-342006",
+      "tax_id": "SYNTH-REG-021825",
+      "currency": "EGP",
+      "line_items": [
+        {
+          "description_ar": "مستلزمات كهربائية",
+          "description_en": "Electrical supplies",
+          "quantity": 5,
+          "unit_price_egp": 420,
+          "line_total_egp": 2100
+        },
+        {
+          "description_ar": "خدمات شحن",
+          "description_en": "Shipping services",
+          "quantity": 6,
+          "unit_price_egp": 1140,
+          "line_total_egp": 6840
+        },
+        {
+          "description_ar": "خدمة تركيب أجهزة",
+          "description_en": "Equipment installation",
+          "quantity": 7,
+          "unit_price_egp": 1750,
+          "line_total_egp": 12250
+        },
+        {
+          "description_ar": "خدمة دعم فني",
+          "description_en": "Technical support",
+          "quantity": 8,
+          "unit_price_egp": 890,
+          "line_total_egp": 7120
+        },
+        {
+          "description_ar": "مواد خام",
+          "description_en": "Raw materials",
+          "quantity": 1,
+          "unit_price_egp": 275,
+          "line_total_egp": 275
+        }
+      ],
+      "subtotal_egp": 28585,
+      "tax_rate": 0.14,
+      "tax_egp": 4001.9,
+      "total_egp": 32586.9,
+      "invoice_iban": "EG00TEST252208271577",
+      "synthetic_only": true
+    },
+    {
+      "id": "STRESS3-008",
+      "file": "STRESS3-008.pdf",
+      "language": "en",
+      "layout_variant": 7,
+      "quality_tier": "clean",
+      "simulated_rotation_degrees": 0,
+      "vendor_name_ar": "شركة المرسى للخدمات",
+      "vendor_name_en": "Al Marsa Services",
+      "invoice_number": "SYN3-2026008",
+      "invoice_date": "2026-08-15",
+      "purchase_order": "PO-342007",
+      "tax_id": "SYNTH-REG-025317",
+      "currency": "EGP",
+      "line_items": [
+        {
+          "description_ar": "مواد خام",
+          "description_en": "Raw materials",
+          "quantity": 7,
+          "unit_price_egp": 275,
+          "line_total_egp": 1925
+        },
+        {
+          "description_ar": "مستلزمات مكتبية",
+          "description_en": "Stationery items",
+          "quantity": 8,
+          "unit_price_egp": 195,
+          "line_total_egp": 1560
+        },
+        {
+          "description_ar": "أجهزة مكتبية",
+          "description_en": "Office equipment",
+          "quantity": 1,
+          "unit_price_egp": 1650,
+          "line_total_egp": 1650
+        },
+        {
+          "description_ar": "صيانة دورية",
+          "description_en": "Scheduled maintenance",
+          "quantity": 2,
+          "unit_price_egp": 1350,
+          "line_total_egp": 2700
+        },
+        {
+          "description_ar": "تراخيص برامج",
+          "description_en": "Software licenses",
+          "quantity": 3,
+          "unit_price_egp": 1950,
+          "line_total_egp": 5850
+        }
+      ],
+      "subtotal_egp": 13685,
+      "tax_rate": 0.14,
+      "tax_egp": 1915.9,
+      "total_egp": 15600.9,
+      "invoice_iban": "EG00TEST292493209845",
+      "synthetic_only": true
+    },
+    {
+      "id": "STRESS3-009",
+      "file": "STRESS3-009.pdf",
+      "language": "mixed",
+      "layout_variant": 8,
+      "quality_tier": "clean",
+      "simulated_rotation_degrees": 0,
+      "vendor_name_ar": "المنارة للتجهيزات",
+      "vendor_name_en": "Al Manara Equipment",
+      "invoice_number": "SYN3-2026009",
+      "invoice_date": "2026-08-17",
+      "purchase_order": "PO-342008",
+      "tax_id": "SYNTH-REG-020079",
+      "currency": "EGP",
+      "line_items": [
+        {
+          "description_ar": "تراخيص برامج",
+          "description_en": "Software licenses",
+          "quantity": 1,
+          "unit_price_egp": 1950,
+          "line_total_egp": 1950
+        },
+        {
+          "description_ar": "معدات وقاية",
+          "description_en": "Protective equipment",
+          "quantity": 2,
+          "unit_price_egp": 360,
+          "line_total_egp": 720
+        }
+      ],
+      "subtotal_egp": 2670,
+      "tax_rate": 0.14,
+      "tax_egp": 373.8,
+      "total_egp": 3043.8,
+      "invoice_iban": "EG00TEST232065802443",
+      "synthetic_only": true
+    },
+    {
+      "id": "STRESS3-010",
+      "file": "STRESS3-010.pdf",
+      "language": "ar",
+      "layout_variant": 9,
+      "quality_tier": "clean",
+      "simulated_rotation_degrees": 0,
+      "vendor_name_ar": "مصنع الروابي",
+      "vendor_name_en": "Rawabi Factory",
+      "invoice_number": "SYN3-2026010",
+      "invoice_date": "2026-08-19",
+      "purchase_order": "PO-342009",
+      "tax_id": "SYNTH-REG-023571",
+      "currency": "EGP",
+      "line_items": [
+        {
+          "description_ar": "خدمة تركيب أجهزة",
+          "description_en": "Equipment installation",
+          "quantity": 3,
+          "unit_price_egp": 1750,
+          "line_total_egp": 5250
+        },
+        {
+          "description_ar": "خدمة دعم فني",
+          "description_en": "Technical support",
+          "quantity": 4,
+          "unit_price_egp": 890,
+          "line_total_egp": 3560
+        }
+      ],
+      "subtotal_egp": 8810,
+      "tax_rate": 0.14,
+      "tax_egp": 1233.4,
+      "total_egp": 10043.4,
+      "invoice_iban": "EG00TEST272350740711",
+      "synthetic_only": true
+    },
+    {
+      "id": "STRESS3-011",
+      "file": "STRESS3-011.pdf",
+      "language": "en",
+      "layout_variant": 0,
+      "quality_tier": "clean",
+      "simulated_rotation_degrees": 0,
+      "vendor_name_ar": "شركة النور للمستلزمات",
+      "vendor_name_en": "Al Nour Supplies",
+      "invoice_number": "SYN3-2026011",
+      "invoice_date": "2026-08-21",
+      "purchase_order": "PO-342010",
+      "tax_id": "SYNTH-REG-018333",
+      "currency": "EGP",
+      "line_items": [
+        {
+          "description_ar": "أجهزة مكتبية",
+          "description_en": "Office equipment",
+          "quantity": 3,
+          "unit_price_egp": 1650,
+          "line_total_egp": 4950
+        },
+        {
+          "description_ar": "صيانة دورية",
+          "description_en": "Scheduled maintenance",
+          "quantity": 4,
+          "unit_price_egp": 1350,
+          "line_total_egp": 5400
+        },
+        {
+          "description_ar": "تراخيص برامج",
+          "description_en": "Software licenses",
+          "quantity": 5,
+          "unit_price_egp": 1950,
+          "line_total_egp": 9750
+        }
+      ],
+      "subtotal_egp": 20100,
+      "tax_rate": 0.14,
+      "tax_egp": 2814.0,
+      "total_egp": 22914.0,
+      "invoice_iban": "EG00TEST211923333309",
+      "synthetic_only": true
+    },
+    {
+      "id": "STRESS3-012",
+      "file": "STRESS3-012.pdf",
+      "language": "mixed",
+      "layout_variant": 1,
+      "quality_tier": "clean",
+      "simulated_rotation_degrees": 0,
+      "vendor_name_ar": "مركز الإتقان للصيانة",
+      "vendor_name_en": "Etqan Maintenance Center",
+      "invoice_number": "SYN3-2026012",
+      "invoice_date": "2026-08-23",
+      "purchase_order": "PO-342011",
+      "tax_id": "SYNTH-REG-021825",
+      "currency": "EGP",
+      "line_items": [
+        {
+          "description_ar": "مستلزمات كهربائية",
+          "description_en": "Electrical supplies",
+          "quantity": 5,
+          "unit_price_egp": 420,
+          "line_total_egp": 2100
+        },
+        {
+          "description_ar": "خدمات شحن",
+          "description_en": "Shipping services",
+          "quantity": 6,
+          "unit_price_egp": 1140,
+          "line_total_egp": 6840
+        },
+        {
+          "description_ar": "خدمة تركيب أجهزة",
+          "description_en": "Equipment installation",
+          "quantity": 7,
+          "unit_price_egp": 1750,
+          "line_total_egp": 12250
+        }
+      ],
+      "subtotal_egp": 21190,
+      "tax_rate": 0.14,
+      "tax_egp": 2966.6,
+      "total_egp": 24156.6,
+      "invoice_iban": "EG00TEST252208271577",
+      "synthetic_only": true
+    },
+    {
+      "id": "STRESS3-013",
+      "file": "STRESS3-013.pdf",
+      "language": "ar",
+      "layout_variant": 2,
+      "quality_tier": "clean",
+      "simulated_rotation_degrees": 0,
+      "vendor_name_ar": "شركة المرسى للخدمات",
+      "vendor_name_en": "Al Marsa Services",
+      "invoice_number": "SYN3-2026013",
+      "invoice_date": "2026-08-25",
+      "purchase_order": "PO-342012",
+      "tax_id": "SYNTH-REG-025317",
+      "currency": "EGP",
+      "line_items": [
+        {
+          "description_ar": "مواد خام",
+          "description_en": "Raw materials",
+          "quantity": 7,
+          "unit_price_egp": 275,
+          "line_total_egp": 1925
+        },
+        {
+          "description_ar": "مستلزمات مكتبية",
+          "description_en": "Stationery items",
+          "quantity": 8,
+          "unit_price_egp": 195,
+          "line_total_egp": 1560
+        },
+        {
+          "description_ar": "أجهزة مكتبية",
+          "description_en": "Office equipment",
+          "quantity": 1,
+          "unit_price_egp": 1650,
+          "line_total_egp": 1650
+        },
+        {
+          "description_ar": "صيانة دورية",
+          "description_en": "Scheduled maintenance",
+          "quantity": 2,
+          "unit_price_egp": 1350,
+          "line_total_egp": 2700
+        }
+      ],
+      "subtotal_egp": 7835,
+      "tax_rate": 0.14,
+      "tax_egp": 1096.9,
+      "total_egp": 8931.9,
+      "invoice_iban": "EG00TEST292493209845",
+      "synthetic_only": true
+    },
+    {
+      "id": "STRESS3-014",
+      "file": "STRESS3-014.pdf",
+      "language": "en",
+      "layout_variant": 3,
+      "quality_tier": "clean",
+      "simulated_rotation_degrees": 0,
+      "vendor_name_ar": "المنارة للتجهيزات",
+      "vendor_name_en": "Al Manara Equipment",
+      "invoice_number": "SYN3-2026014",
+      "invoice_date": "2026-08-27",
+      "purchase_order": "PO-342013",
+      "tax_id": "SYNTH-REG-020079",
+      "currency": "EGP",
+      "line_items": [
+        {
+          "description_ar": "تراخيص برامج",
+          "description_en": "Software licenses",
+          "quantity": 1,
+          "unit_price_egp": 1950,
+          "line_total_egp": 1950
+        },
+        {
+          "description_ar": "معدات وقاية",
+          "description_en": "Protective equipment",
+          "quantity": 2,
+          "unit_price_egp": 360,
+          "line_total_egp": 720
+        },
+        {
+          "description_ar": "مستلزمات كهربائية",
+          "description_en": "Electrical supplies",
+          "quantity": 3,
+          "unit_price_egp": 420,
+          "line_total_egp": 1260
+        },
+        {
+          "description_ar": "خدمات شحن",
+          "description_en": "Shipping services",
+          "quantity": 4,
+          "unit_price_egp": 1140,
+          "line_total_egp": 4560
+        }
+      ],
+      "subtotal_egp": 8490,
+      "tax_rate": 0.14,
+      "tax_egp": 1188.6,
+      "total_egp": 9678.6,
+      "invoice_iban": "EG00TEST232065802443",
+      "synthetic_only": true
+    },
+    {
+      "id": "STRESS3-015",
+      "file": "STRESS3-015.pdf",
+      "language": "mixed",
+      "layout_variant": 4,
+      "quality_tier": "clean",
+      "simulated_rotation_degrees": 0,
+      "vendor_name_ar": "مصنع الروابي",
+      "vendor_name_en": "Rawabi Factory",
+      "invoice_number": "SYN3-2026015",
+      "invoice_date": "2026-08-29",
+      "purchase_order": "PO-342014",
+      "tax_id": "SYNTH-REG-023571",
+      "currency": "EGP",
+      "line_items": [
+        {
+          "description_ar": "خدمة تركيب أجهزة",
+          "description_en": "Equipment installation",
+          "quantity": 3,
+          "unit_price_egp": 1750,
+          "line_total_egp": 5250
+        },
+        {
+          "description_ar": "خدمة دعم فني",
+          "description_en": "Technical support",
+          "quantity": 4,
+          "unit_price_egp": 890,
+          "line_total_egp": 3560
+        },
+        {
+          "description_ar": "مواد خام",
+          "description_en": "Raw materials",
+          "quantity": 5,
+          "unit_price_egp": 275,
+          "line_total_egp": 1375
+        },
+        {
+          "description_ar": "مستلزمات مكتبية",
+          "description_en": "Stationery items",
+          "quantity": 6,
+          "unit_price_egp": 195,
+          "line_total_egp": 1170
+        },
+        {
+          "description_ar": "أجهزة مكتبية",
+          "description_en": "Office equipment",
+          "quantity": 7,
+          "unit_price_egp": 1650,
+          "line_total_egp": 11550
+        }
+      ],
+      "subtotal_egp": 22905,
+      "tax_rate": 0.14,
+      "tax_egp": 3206.7,
+      "total_egp": 26111.7,
+      "invoice_iban": "EG00TEST272350740711",
+      "synthetic_only": true
+    },
+    {
+      "id": "STRESS3-016",
+      "file": "STRESS3-016.pdf",
+      "language": "ar",
+      "layout_variant": 5,
+      "quality_tier": "clean",
+      "simulated_rotation_degrees": 0,
+      "vendor_name_ar": "شركة النور للمستلزمات",
+      "vendor_name_en": "Al Nour Supplies",
+      "invoice_number": "SYN3-2026016",
+      "invoice_date": "2026-08-31",
+      "purchase_order": "PO-342015",
+      "tax_id": "SYNTH-REG-018333",
+      "currency": "EGP",
+      "line_items": [
+        {
+          "description_ar": "أجهزة مكتبية",
+          "description_en": "Office equipment",
+          "quantity": 5,
+          "unit_price_egp": 1650,
+          "line_total_egp": 8250
+        },
+        {
+          "description_ar": "صيانة دورية",
+          "description_en": "Scheduled maintenance",
+          "quantity": 6,
+          "unit_price_egp": 1350,
+          "line_total_egp": 8100
+        },
+        {
+          "description_ar": "تراخيص برامج",
+          "description_en": "Software licenses",
+          "quantity": 7,
+          "unit_price_egp": 1950,
+          "line_total_egp": 13650
+        },
+        {
+          "description_ar": "معدات وقاية",
+          "description_en": "Protective equipment",
+          "quantity": 8,
+          "unit_price_egp": 360,
+          "line_total_egp": 2880
+        },
+        {
+          "description_ar": "مستلزمات كهربائية",
+          "description_en": "Electrical supplies",
+          "quantity": 1,
+          "unit_price_egp": 420,
+          "line_total_egp": 420
+        }
+      ],
+      "subtotal_egp": 33300,
+      "tax_rate": 0.14,
+      "tax_egp": 4662.0,
+      "total_egp": 37962.0,
+      "invoice_iban": "EG00TEST211923333309",
+      "synthetic_only": true
+    },
+    {
+      "id": "STRESS3-017",
+      "file": "STRESS3-017.pdf",
+      "language": "en",
+      "layout_variant": 6,
+      "quality_tier": "clean",
+      "simulated_rotation_degrees": 0,
+      "vendor_name_ar": "مركز الإتقان للصيانة",
+      "vendor_name_en": "Etqan Maintenance Center",
+      "invoice_number": "SYN3-2026017",
+      "invoice_date": "2026-09-02",
+      "purchase_order": "PO-342016",
+      "tax_id": "SYNTH-REG-021825",
+      "currency": "EGP",
+      "line_items": [
+        {
+          "description_ar": "مستلزمات كهربائية",
+          "description_en": "Electrical supplies",
+          "quantity": 7,
+          "unit_price_egp": 420,
+          "line_total_egp": 2940
+        },
+        {
+          "description_ar": "خدمات شحن",
+          "description_en": "Shipping services",
+          "quantity": 8,
+          "unit_price_egp": 1140,
+          "line_total_egp": 9120
+        }
+      ],
+      "subtotal_egp": 12060,
+      "tax_rate": 0.14,
+      "tax_egp": 1688.4,
+      "total_egp": 13748.4,
+      "invoice_iban": "EG00TEST252208271577",
+      "synthetic_only": true
+    },
+    {
+      "id": "STRESS3-018",
+      "file": "STRESS3-018.pdf",
+      "language": "mixed",
+      "layout_variant": 7,
+      "quality_tier": "clean",
+      "simulated_rotation_degrees": 0,
+      "vendor_name_ar": "شركة المرسى للخدمات",
+      "vendor_name_en": "Al Marsa Services",
+      "invoice_number": "SYN3-2026018",
+      "invoice_date": "2026-09-04",
+      "purchase_order": "PO-342017",
+      "tax_id": "SYNTH-REG-025317",
+      "currency": "EGP",
+      "line_items": [
+        {
+          "description_ar": "مواد خام",
+          "description_en": "Raw materials",
+          "quantity": 1,
+          "unit_price_egp": 275,
+          "line_total_egp": 275
+        },
+        {
+          "description_ar": "مستلزمات مكتبية",
+          "description_en": "Stationery items",
+          "quantity": 2,
+          "unit_price_egp": 195,
+          "line_total_egp": 390
+        }
+      ],
+      "subtotal_egp": 665,
+      "tax_rate": 0.14,
+      "tax_egp": 93.1,
+      "total_egp": 758.1,
+      "invoice_iban": "EG00TEST292493209845",
+      "synthetic_only": true
+    },
+    {
+      "id": "STRESS3-019",
+      "file": "STRESS3-019.pdf",
+      "language": "ar",
+      "layout_variant": 8,
+      "quality_tier": "clean",
+      "simulated_rotation_degrees": 0,
+      "vendor_name_ar": "المنارة للتجهيزات",
+      "vendor_name_en": "Al Manara Equipment",
+      "invoice_number": "SYN3-2026019",
+      "invoice_date": "2026-09-06",
+      "purchase_order": "PO-342018",
+      "tax_id": "SYNTH-REG-020079",
+      "currency": "EGP",
+      "line_items": [
+        {
+          "description_ar": "تراخيص برامج",
+          "description_en": "Software licenses",
+          "quantity": 3,
+          "unit_price_egp": 1950,
+          "line_total_egp": 5850
+        },
+        {
+          "description_ar": "معدات وقاية",
+          "description_en": "Protective equipment",
+          "quantity": 4,
+          "unit_price_egp": 360,
+          "line_total_egp": 1440
+        },
+        {
+          "description_ar": "مستلزمات كهربائية",
+          "description_en": "Electrical supplies",
+          "quantity": 5,
+          "unit_price_egp": 420,
+          "line_total_egp": 2100
+        }
+      ],
+      "subtotal_egp": 9390,
+      "tax_rate": 0.14,
+      "tax_egp": 1314.6,
+      "total_egp": 10704.6,
+      "invoice_iban": "EG00TEST232065802443",
+      "synthetic_only": true
+    },
+    {
+      "id": "STRESS3-020",
+      "file": "STRESS3-020.pdf",
+      "language": "en",
+      "layout_variant": 9,
+      "quality_tier": "clean",
+      "simulated_rotation_degrees": 0,
+      "vendor_name_ar": "مصنع الروابي",
+      "vendor_name_en": "Rawabi Factory",
+      "invoice_number": "SYN3-2026020",
+      "invoice_date": "2026-09-08",
+      "purchase_order": "PO-342019",
+      "tax_id": "SYNTH-REG-023571",
+      "currency": "EGP",
+      "line_items": [
+        {
+          "description_ar": "خدمة تركيب أجهزة",
+          "description_en": "Equipment installation",
+          "quantity": 5,
+          "unit_price_egp": 1750,
+          "line_total_egp": 8750
+        },
+        {
+          "description_ar": "خدمة دعم فني",
+          "description_en": "Technical support",
+          "quantity": 6,
+          "unit_price_egp": 890,
+          "line_total_egp": 5340
+        },
+        {
+          "description_ar": "مواد خام",
+          "description_en": "Raw materials",
+          "quantity": 7,
+          "unit_price_egp": 275,
+          "line_total_egp": 1925
+        }
+      ],
+      "subtotal_egp": 16015,
+      "tax_rate": 0.14,
+      "tax_egp": 2242.1,
+      "total_egp": 18257.1,
+      "invoice_iban": "EG00TEST272350740711",
+      "synthetic_only": true
+    }
+  ]
+}
