@@ -1,4 +1,5 @@
 """Routing: classify the user's request into one route (a single small LLM call)."""
+import logging
 from datetime import date
 from enum import Enum
 
@@ -6,7 +7,6 @@ from pydantic import BaseModel, Field
 
 from ai_core.llm import get_llm
 from ai_core.prompts import load_prompt, untrusted
-import logging
 
 log = logging.getLogger(__name__)
 
