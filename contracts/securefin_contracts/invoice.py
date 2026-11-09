@@ -48,3 +48,6 @@ class Invoice(Contract):
     category: str | None = Field(default=None, max_length=64)
     uploaded_by: int | None = None
     created_at: datetime
+    # From the extractor; used to build RiskFeatures. Stable codes such as TOTAL_MISMATCH, never free text.
+    extraction_issues: list[str] = Field(default_factory=list, max_length=20)
+    ocr_confidence: float | None = Field(default=None, ge=0, le=1)
