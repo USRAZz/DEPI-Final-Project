@@ -1,11 +1,15 @@
 """Explainable, rules-only risk scoring for the MVP skeleton."""
 
 import os
+from decimal import Decimal
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, status
 from securefin_contracts import RiskLevel, RiskRequest, RiskScore
 
+from .features_client import FeaturesUnavailableError, build_features_client
+
 app = FastAPI(title="SecureFin Risk Engine")
+FEATURES_CLIENT = build_features_client()
 
 # These are demo defaults, not approved financial policy. The gateway owns
 # payment decisions; this service only reports a risk score and rule codes.
@@ -21,8 +25,19 @@ def health():
 
 @app.post("/v1/score", response_model=RiskScore)
 def score(req: RiskRequest) -> RiskScore:
-    """Score explicitly supplied features; never return sensitive feature values."""
-    features = req.features
+    """Score the invoice's features; never return sensitive feature values.
+
+    Features sent in the request are used as given (tests, manual checks). Otherwise they are fetched
+    from the api by invoice_id; if that fails the answer is 503, which the gateway treats as
+    "risk unavailable" and holds the payment (never fails open).
+    """
+    if "features" in req.model_fields_set or req.invoice_id is None:
+        features = req.features
+    else:
+        try:
+            features = FEATURES_CLIENT.fetch(req.invoice_id).model_dump()
+        except FeaturesUnavailableError as e:
+            raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, f"risk features unavailable: {e}") from e
     points = 0
     hits: list[str] = []
 
@@ -38,7 +53,7 @@ def score(req: RiskRequest) -> RiskScore:
     flag("invoice_total_mismatch", "INVOICE_TOTAL_MISMATCH", 40)
 
     amount = features.get("invoice_total_egp")
-    if isinstance(amount, (int, float)) and not isinstance(amount, bool) and amount >= _AMOUNT_REVIEW_EGP:
+    if isinstance(amount, (int, float, Decimal)) and not isinstance(amount, bool) and amount >= _AMOUNT_REVIEW_EGP:
         hits.append("HIGH_VALUE_REVIEW")
         points += 20
 
