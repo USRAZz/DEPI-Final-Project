@@ -8,6 +8,7 @@ import time
 from pathlib import Path
 
 from ai_core.llm import Budget, BudgetExceeded, StructuredOutputError, get_llm
+from ai_core.privacy import find_ibans, find_tax_ids, mask_sensitive
 from ai_core.prompts import load_prompt, untrusted
 
 from .ocr import extract_text_and_confidence
@@ -82,15 +83,21 @@ def process_invoice(path, *, invoice_id: str | None = None, llm_extract=None, ll
     if len(text.strip()) < 20:
         return result("FAILED", issues=["OCR returned almost no text"], ocr_chars=len(text))
 
-    # 2) LLM 1: the ONLY step that sees the raw text. No tools; JSON only.
+    # IBAN and tax id are read by code and masked out of the text: they never reach the LLM provider.
+    ibans, tax_ids = find_ibans(text), find_tax_ids(text)
+
+    # 2) LLM 1: the ONLY step that sees the (masked) OCR text. No tools; JSON only.
     llm_extract = llm_extract or get_llm("extractor")
     system = load_prompt("extractor", json_schema=json.dumps(InvoiceFields.model_json_schema(), ensure_ascii=False))
     try:
         fields = llm_extract.structured([{"role": "system", "content": system},
-                                         {"role": "user", "content": untrusted(text)}],
+                                         {"role": "user", "content": untrusted(mask_sensitive(text))}],
                                         InvoiceFields, budget=budget)
     except (StructuredOutputError, BudgetExceeded) as e:
         return result("FAILED", issues=[f"extraction failed: {e}"], ocr_chars=len(text))
+
+    fields = fields.model_copy(update={"iban": ibans[0] if ibans else None,
+                                       "tax_id": tax_ids[0] if tax_ids else None})
 
     # 3) GATE 1: checks in code
     codes = check_field_codes(fields)

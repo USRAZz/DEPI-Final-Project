@@ -9,7 +9,7 @@ Rules:
 - currency: ISO code (EGP, USD, EUR...). If the invoice only says "جنيه" or "LE", use EGP.
 - vendor_name: the seller (the company that issued the invoice), not the customer.
 - invoice_number: the invoice's own number, not an order number, PO number or tax-registration number.
-- iban: only if clearly shown. tax_id: the seller's tax registration number if shown.
+- Bank accounts, tax numbers, phone numbers and e-mails are replaced with [IBAN], [TAX_ID], [PHONE], [EMAIL] before you see the text. Always return null for iban and tax_id: code fills them in.
 - language: "ar", "en" or "mixed" for the document.
 - line_items: every purchased line; an empty list if none can be read.
 
