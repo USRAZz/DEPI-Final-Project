@@ -72,3 +72,6 @@ build/
 *.egg-info/
 eval/results/
 eval/output/
+
+# Local scratch output from the invoice generators.
+/.tmp-*/

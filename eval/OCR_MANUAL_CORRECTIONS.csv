@@ -1,0 +1,68 @@
+﻿invoice_id,field,closest_ocr_text,manifest_expected,value_read_from_invoice,review_status,review_note
+INV-002,vendor,مؤسسة ة الأفق المكتبي,مؤسسة الأفق المكتبي,مؤسسة الأفق المكتبي,visually_confirmed,Source invoice page visually checked; raw OCR remains unchanged
+INV-008,vendor,مكتبة ال الصفوة,مكتبة الصفوة,مكتبة الصفوة,visually_confirmed,Source invoice page visually checked; raw OCR remains unchanged
+INV-012,vendor,مؤسسة ة الأفق المكتبي,مؤسسة الأفق المكتبي,مؤسسة الأفق المكتبي,visually_confirmed,Source invoice page visually checked; raw OCR remains unchanged
+INV-018,vendor,النور ل للصيانة,النور للصيانة,النور للصيانة,visually_confirmed,Source invoice page visually checked; raw OCR remains unchanged
+STRESS-001,line_1_description,ورق لصوير,ورق تصوير A4,ورق تصوير A4,visually_confirmed,Source invoice page visually checked; raw OCR remains unchanged
+STRESS-003,tax,"1,521.B0 EGP","1,521.80","1,521.80",visually_confirmed,Source invoice page visually checked; raw OCR remains unchanged
+STRESS-003,line_2_description,اكونعق الساى السون,خدمات نقل | Transport service,خدمات نقل,visually_confirmed,Source invoice page visually checked; raw OCR remains unchanged
+STRESS-003,line_3_description,لبرات مكية,أدوات مكتبية | Office supplies,أدوات مكتبية,visually_confirmed,Source invoice page visually checked; raw OCR remains unchanged
+STRESS-003,line_4_description,لبرات مكية,حبر طابعة | Printer toner,حبر طابعة,visually_confirmed,Source invoice page visually checked; raw OCR remains unchanged
+STRESS-004,line_2_description,مواد دبكة,مواد تعبئة,مواد بديلة,source_label_mismatch,PDF wording differs from manifest expected label
+STRESS-004,line_3_description,ورق لصوير 4م,ورق تصوير A4,ورق تصوير A4,visually_confirmed,Source invoice page visually checked; raw OCR remains unchanged
+STRESS-005,tax,665.20 EGP,655.20,655.20,visually_confirmed,Source invoice page visually checked; raw OCR remains unchanged
+STRESS-007,line_1_description,أوات مكية,أدوات مكتبية,أدوات مكتبية,visually_confirmed,Source invoice page visually checked; raw OCR remains unchanged
+STRESS-007,line_2_description,حر طبعة,حبر طابعة,حبر طابعة,visually_confirmed,Source invoice page visually checked; raw OCR remains unchanged
+STRESS-007,line_3_description,خمة صيانة,خدمة صيانة,خدمة صيانة,visually_confirmed,Source invoice page visually checked; raw OCR remains unchanged
+STRESS-007,line_4_description,مواد تجينة,مواد تعبئة,مواد تعبئة,visually_confirmed,Source invoice page visually checked; raw OCR remains unchanged
+STRESS-013,line_1_description,ممدات شبكات,معدات شبكات,معدات شبكات,visually_confirmed,Source invoice page visually checked; raw OCR remains unchanged
+STRESS-013,line_2_description,خدمات اسلشارية,خدمات استشارية,خدمات استشارية,visually_confirmed,Source invoice page visually checked; raw OCR remains unchanged
+STRESS-014,line_1_description,Packaging matenais,Packaging materials,Packaging materials,visually_confirmed,Source invoice page visually checked; raw OCR remains unchanged
+STRESS-016,line_1_description,وري سور خد,ورق تصوير A4,ورق تصوير A4,visually_confirmed,Source invoice page visually checked; raw OCR remains unchanged
+STRESS-016,line_2_description,ميد ترن إعوات,مياه شرب (عبوات),مياه شرب (عبوات),visually_confirmed,Source invoice page visually checked; raw OCR remains unchanged
+STRESS-016,line_3_description,مندت قكت,معدات شبكات,معدات شبكات,visually_confirmed,Source invoice page visually checked; raw OCR remains unchanged
+STRESS-021,line_1_description,qumnt  معت شبكت,معدات شبكات | Network equipment,معدات شبكات,visually_confirmed,Source invoice page visually checked; raw OCR remains unchanged
+STRESS-022,line_4_description,مواد تعبنة,مواد تعبئة,مواد تعبئة,visually_confirmed,Source invoice page visually checked; raw OCR remains unchanged
+STRESS-022,line_5_description,ورق تصوير,ورق تصوير A4,ورق تصوير A4,visually_confirmed,Source invoice page visually checked; raw OCR remains unchanged
+STRESS-025,line_1_description,قع,قطع غيار,قطع غيار,visual_read_uncertain,Source image is too blurred/small to confirm this wording independently
+STRESS-025,line_2_description,ات بل,خدمات نقل,خدمات نقل,visual_read_uncertain,Source image is too blurred/small to confirm this wording independently
+STRESS-028,line_1_description,محدات شكات,معدات شبكات,معدات شبكات,visually_confirmed,Source invoice page visually checked; raw OCR remains unchanged
+STRESS-030,line_1_description,Otyاكمبية,أدوات مكتبية | Office supplies,أدوات مكتبية,visually_confirmed,Source invoice page visually checked; raw OCR remains unchanged
+STRESS-030,line_2_description,بورهة,حبر طابعة | Printer toner,حبر طابعة,visually_confirmed,Source invoice page visually checked; raw OCR remains unchanged
+STRESS-030,line_3_description,تسمية لورة,خدمة صيانة | Maintenance service,خدمة صيانة,visually_confirmed,Source invoice page visually checked; raw OCR remains unchanged
+STRESS-030,line_4_description,uples  وات بrمة,مواد تعبئة | Packaging materials,مواد تعبئة,visually_confirmed,Source invoice page visually checked; raw OCR remains unchanged
+STRESS-030,line_4_line_total_egp,630:00,630.00,630.00,visually_confirmed,Source invoice page visually checked; raw OCR remains unchanged
+STRESS2-003,line_1_description,أدالجم,معدات سلامة | Safety equipment,معدات سلامة,visually_confirmed,Source invoice page visually checked; raw OCR remains unchanged
+STRESS2-003,line_2_description,فاتورةضريبية,خدمة توصيل | Delivery service,خدمة توصيل,visually_confirmed,Source invoice page visually checked; raw OCR remains unchanged
+STRESS2-003,line_3_description,فاتورةضريبية,تدريب فني | Technical training,تدريب فني,visually_confirmed,Source invoice page visually checked; raw OCR remains unchanged
+STRESS2-003,line_4_description,فاتورةضريبية,خدمة تركيب | Installation service,خدمة تركيب,visually_confirmed,Source invoice page visually checked; raw OCR remains unchanged
+STRESS2-004,line_1_description,اشراك برمجي,اشتراك برمجي,اشتراك برمجي,visually_confirmed,Source invoice page visually checked; raw OCR remains unchanged
+STRESS2-004,line_2_description,مسلزمات نغليف,مستلزمات تغليف,مستلزمات تغليف,visually_confirmed,Source invoice page visually checked; raw OCR remains unchanged
+STRESS2-005,line_1_description,Delvery senvce,Delivery service,Delivery service,visually_confirmed,Source invoice page visually checked; raw OCR remains unchanged
+STRESS2-007,line_1_description,تريب في,تدريب فني,تدريب فني,visual_read_uncertain,Source image is too blurred/small to confirm this wording independently
+STRESS2-007,line_2_description,خمه ركيب,خدمة تركيب,خدمة تركيب,visual_read_uncertain,Source image is too blurred/small to confirm this wording independently
+STRESS2-007,line_3_description,شرك ومي,اشتراك برمجي,اشتراك برمجي,visual_read_uncertain,Source image is too blurred/small to confirm this wording independently
+STRESS2-007,line_4_description,ستزمات عليف,مستلزمات تغليف,مستلزمات تغليف,visual_read_uncertain,Source image is too blurred/small to confirm this wording independently
+STRESS2-013,line_1_description,فلع كهرباكية,قطع كهربائية,قطع كهربائية,visually_confirmed,Source invoice page visually checked; raw OCR remains unchanged
+STRESS2-013,line_2_description,خدمة معابرة,خدمة معايرة,خدمة معايرة,visually_confirmed,Source invoice page visually checked; raw OCR remains unchanged
+STRESS2-014,line_1_description,Whapping supplies,Wrapping supplies,Wrapping supplies,visually_confirmed,Source invoice page visually checked; raw OCR remains unchanged
+STRESS2-016,line_1_description,لسار ولتات مطاعة,أحبار وأدوات طباعة,أحبار وأدوات طباعة,visually_confirmed,Source invoice page visually checked; raw OCR remains unchanged
+STRESS2-016,line_2_description,مواد لنليف,مواد تنظيف,مواد تنظيف,visually_confirmed,Source invoice page visually checked; raw OCR remains unchanged
+STRESS2-016,line_3_description,فاتورة ضريبية,قطع كهربائية,قطع كهربائية,visually_confirmed,Source invoice page visually checked; raw OCR remains unchanged
+STRESS2-025,line_1_description,مسات صالمه,معدات سلامة,معدات سلامة,visually_confirmed,Source invoice page visually checked; raw OCR remains unchanged
+STRESS2-025,line_2_description,عقة قوصيل,خدمة توصيل,خدمة توصيل,visually_confirmed,Source invoice page visually checked; raw OCR remains unchanged
+STRESS2-028,line_1_description,فطع كهربائبة,قطع كهربائية,قطع كهربائية,visually_confirmed,Source invoice page visually checked; raw OCR remains unchanged
+STRESS2-030,line_1_description,فاتورة ضريبية,تدريب فني | Technical training,تدريب فني,visually_confirmed,Source invoice page visually checked; raw OCR remains unchanged
+STRESS2-030,line_2_description,In oة ركب,خدمة تركيب | Installation service,خدمة تركيب,visually_confirmed,Source invoice page visually checked; raw OCR remains unchanged
+STRESS2-030,line_3_description,الره رمي,اشتراك برمجي | Software subscription,اشتراك برمجي,visually_confirmed,Source invoice page visually checked; raw OCR remains unchanged
+STRESS2-030,line_4_description,g مطرت لف,مستلزمات تغليف | Wrapping supplies,مستلزمات تغليف,visually_confirmed,Source invoice page visually checked; raw OCR remains unchanged
+STRESS2-030,line_5_description,ال اات ة,أحبار وأدوات طباعة | Ink and printing supplies,أحبار وأدوات طباعة,visually_confirmed,Source invoice page visually checked; raw OCR remains unchanged
+STRESS2-030,line_5_line_total_egp,"1,450.00","1,560.00","1,560.00",visually_confirmed,Source invoice page visually checked; raw OCR remains unchanged
+STRESS3-001,line_2_description,صيبانة دورية,صيانة دورية,صيانة دورية,visually_confirmed,Source invoice page visually checked; raw OCR remains unchanged
+STRESS3-007,vendor,مركز ٤ إتقان للصيائة,مركز الإتقان للصيانة,مركز الإتقان للصيانة,visually_confirmed,Source invoice page visually checked; raw OCR remains unchanged
+STRESS3-010,line_1_description,خدمة تركبب أجهزة,خدمة تركيب أجهزة,خدمة تركيب أجهزة,visually_confirmed,Source invoice page visually checked; raw OCR remains unchanged
+STRESS3-016,line_2_description,صديانة دورية,صيانة دورية,صيانة دورية,visually_confirmed,Source invoice page visually checked; raw OCR remains unchanged
+STRESS3-016,line_3_description,تراخبص برامج,تراخيص برامج,تراخيص برامج,visually_confirmed,Source invoice page visually checked; raw OCR remains unchanged
+STRESS3-016,line_4_description,محدات وفاية,معدات وقاية,معدات وقاية,visually_confirmed,Source invoice page visually checked; raw OCR remains unchanged
+STRESS3-018,vendor,ars Servies  / شركة المرسی للخدمات,شركة المرسى للخدمات | Al Marsa Services,شركة المرسى للخدمات,visually_confirmed,Source invoice page visually checked; raw OCR remains unchanged
+STRESS3-019,line_2_description,معدات وقابة,معدات وقاية,معدات وقاية,visually_confirmed,Source invoice page visually checked; raw OCR remains unchanged
