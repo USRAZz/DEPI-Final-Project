@@ -11,6 +11,7 @@ version: 1
 
 approvals:
   two_approver_threshold_egp: 10000   # amount above this (strictly) needs 2 distinct approvers
+  approver_roles: [approver, admin]   # only these roles may approve a payment
   creator_can_approve: false          # maker-checker: never configurable per company in MVP
   approval_expiry_hours: 72           # signed approval is void after this
 

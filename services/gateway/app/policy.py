@@ -27,6 +27,7 @@ class _Strict(BaseModel):
 class Approvals(_Strict):
     two_approver_threshold_egp: Decimal = Field(gt=0)
     creator_can_approve: Literal[False]  # maker-checker: never allowed
+    approver_roles: frozenset[Role] = Field(min_length=1)
     approval_expiry_hours: int = Field(gt=0)
 
 
