@@ -1,0 +1,1278 @@
+{
+  "dataset": "SecureFin Varied Synthetic Invoice OCR Set",
+  "version": "1.0",
+  "count": 30,
+  "synthetic_only": true,
+  "license": "CC0-1.0",
+  "languages": {
+    "ar": 10,
+    "en": 10,
+    "mixed": 10
+  },
+  "quality_tiers": {
+    "clean": 10,
+    "moderate": 10,
+    "hard": 10
+  },
+  "layout_count": 10,
+  "notes": "Some pages are intentionally low contrast, skewed, blurred, downsampled, and JPEG-compressed. The quality_tier field indicates the intended difficulty.",
+  "records": [
+    {
+      "id": "STRESS-001",
+      "file": "STRESS-001.pdf",
+      "language": "ar",
+      "layout_variant": 0,
+      "quality_tier": "clean",
+      "simulated_rotation_degrees": 0,
+      "vendor_name_ar": "شركة السنبلة للتجارة",
+      "vendor_name_en": "Sunbulah Trading",
+      "invoice_number": "SYN-2026001",
+      "invoice_date": "2026-02-01",
+      "purchase_order": "PO-42000",
+      "tax_id": "SYNTH-REG-000873",
+      "currency": "EGP",
+      "line_items": [
+        {
+          "description_ar": "ورق تصوير A4",
+          "description_en": "A4 copier paper",
+          "quantity": 1,
+          "unit_price_egp": 175,
+          "line_total_egp": 175
+        }
+      ],
+      "subtotal_egp": 175,
+      "tax_rate": 0.14,
+      "tax_egp": 24.5,
+      "total_egp": 199.5,
+      "invoice_iban": "EG00TEST010498641969",
+      "synthetic_only": true
+    },
+    {
+      "id": "STRESS-002",
+      "file": "STRESS-002.pdf",
+      "language": "en",
+      "layout_variant": 0,
+      "quality_tier": "moderate",
+      "simulated_rotation_degrees": -0.42,
+      "vendor_name_ar": "شركة المشرق للتوريد",
+      "vendor_name_en": "Mashreq Supply Co.",
+      "invoice_number": "SYN-2026002",
+      "invoice_date": "2026-02-03",
+      "purchase_order": "PO-42001",
+      "tax_id": "SYNTH-REG-003492",
+      "currency": "EGP",
+      "line_items": [
+        {
+          "description_ar": "حبر طابعة",
+          "description_en": "Printer toner",
+          "quantity": 2,
+          "unit_price_egp": 640,
+          "line_total_egp": 1280
+        },
+        {
+          "description_ar": "خدمة صيانة",
+          "description_en": "Maintenance service",
+          "quantity": 3,
+          "unit_price_egp": 1250,
+          "line_total_egp": 3750
+        },
+        {
+          "description_ar": "مواد تعبئة",
+          "description_en": "Packaging materials",
+          "quantity": 4,
+          "unit_price_egp": 315,
+          "line_total_egp": 1260
+        }
+      ],
+      "subtotal_egp": 6290,
+      "tax_rate": 0.14,
+      "tax_egp": 880.6,
+      "total_egp": 7170.6,
+      "invoice_iban": "EG00TEST040712345670",
+      "synthetic_only": true
+    },
+    {
+      "id": "STRESS-003",
+      "file": "STRESS-003.pdf",
+      "language": "mixed",
+      "layout_variant": 0,
+      "quality_tier": "hard",
+      "simulated_rotation_degrees": 0.69,
+      "vendor_name_ar": "شركة الواحة للنقل",
+      "vendor_name_en": "Oasis Transport",
+      "invoice_number": "SYN-2026003",
+      "invoice_date": "2026-02-05",
+      "purchase_order": "PO-42002",
+      "tax_id": "SYNTH-REG-006111",
+      "currency": "EGP",
+      "line_items": [
+        {
+          "description_ar": "قطع غيار",
+          "description_en": "Replacement parts",
+          "quantity": 3,
+          "unit_price_egp": 920,
+          "line_total_egp": 2760
+        },
+        {
+          "description_ar": "خدمات نقل",
+          "description_en": "Transport service",
+          "quantity": 4,
+          "unit_price_egp": 780,
+          "line_total_egp": 3120
+        },
+        {
+          "description_ar": "أدوات مكتبية",
+          "description_en": "Office supplies",
+          "quantity": 5,
+          "unit_price_egp": 230,
+          "line_total_egp": 1150
+        },
+        {
+          "description_ar": "حبر طابعة",
+          "description_en": "Printer toner",
+          "quantity": 6,
+          "unit_price_egp": 640,
+          "line_total_egp": 3840
+        }
+      ],
+      "subtotal_egp": 10870,
+      "tax_rate": 0.14,
+      "tax_egp": 1521.8,
+      "total_egp": 12391.8,
+      "invoice_iban": "EG00TEST070926049371",
+      "synthetic_only": true
+    },
+    {
+      "id": "STRESS-004",
+      "file": "STRESS-004.pdf",
+      "language": "ar",
+      "layout_variant": 1,
+      "quality_tier": "moderate",
+      "simulated_rotation_degrees": -0.96,
+      "vendor_name_ar": "شركة السنبلة للتجارة",
+      "vendor_name_en": "Sunbulah Trading",
+      "invoice_number": "SYN-2026004",
+      "invoice_date": "2026-02-07",
+      "purchase_order": "PO-42003",
+      "tax_id": "SYNTH-REG-000873",
+      "currency": "EGP",
+      "line_items": [
+        {
+          "description_ar": "خدمة صيانة",
+          "description_en": "Maintenance service",
+          "quantity": 5,
+          "unit_price_egp": 1250,
+          "line_total_egp": 6250
+        },
+        {
+          "description_ar": "مواد تعبئة",
+          "description_en": "Packaging materials",
+          "quantity": 6,
+          "unit_price_egp": 315,
+          "line_total_egp": 1890
+        },
+        {
+          "description_ar": "ورق تصوير A4",
+          "description_en": "A4 copier paper",
+          "quantity": 7,
+          "unit_price_egp": 175,
+          "line_total_egp": 1225
+        }
+      ],
+      "subtotal_egp": 9365,
+      "tax_rate": 0.14,
+      "tax_egp": 1311.1,
+      "total_egp": 10676.1,
+      "invoice_iban": "EG00TEST010498641969",
+      "synthetic_only": true
+    },
+    {
+      "id": "STRESS-005",
+      "file": "STRESS-005.pdf",
+      "language": "en",
+      "layout_variant": 1,
+      "quality_tier": "hard",
+      "simulated_rotation_degrees": 1.23,
+      "vendor_name_ar": "شركة المشرق للتوريد",
+      "vendor_name_en": "Mashreq Supply Co.",
+      "invoice_number": "SYN-2026005",
+      "invoice_date": "2026-02-09",
+      "purchase_order": "PO-42004",
+      "tax_id": "SYNTH-REG-003492",
+      "currency": "EGP",
+      "line_items": [
+        {
+          "description_ar": "خدمات نقل",
+          "description_en": "Transport service",
+          "quantity": 6,
+          "unit_price_egp": 780,
+          "line_total_egp": 4680
+        }
+      ],
+      "subtotal_egp": 4680,
+      "tax_rate": 0.14,
+      "tax_egp": 655.2,
+      "total_egp": 5335.2,
+      "invoice_iban": "EG00TEST040712345670",
+      "synthetic_only": true
+    },
+    {
+      "id": "STRESS-006",
+      "file": "STRESS-006.pdf",
+      "language": "mixed",
+      "layout_variant": 1,
+      "quality_tier": "clean",
+      "simulated_rotation_degrees": 0,
+      "vendor_name_ar": "شركة الواحة للنقل",
+      "vendor_name_en": "Oasis Transport",
+      "invoice_number": "SYN-2026006",
+      "invoice_date": "2026-02-11",
+      "purchase_order": "PO-42005",
+      "tax_id": "SYNTH-REG-006111",
+      "currency": "EGP",
+      "line_items": [
+        {
+          "description_ar": "معدات شبكات",
+          "description_en": "Network equipment",
+          "quantity": 7,
+          "unit_price_egp": 2400,
+          "line_total_egp": 16800
+        },
+        {
+          "description_ar": "خدمات استشارية",
+          "description_en": "Consulting services",
+          "quantity": 8,
+          "unit_price_egp": 1800,
+          "line_total_egp": 14400
+        },
+        {
+          "description_ar": "قطع غيار",
+          "description_en": "Replacement parts",
+          "quantity": 1,
+          "unit_price_egp": 920,
+          "line_total_egp": 920
+        },
+        {
+          "description_ar": "خدمات نقل",
+          "description_en": "Transport service",
+          "quantity": 2,
+          "unit_price_egp": 780,
+          "line_total_egp": 1560
+        },
+        {
+          "description_ar": "أدوات مكتبية",
+          "description_en": "Office supplies",
+          "quantity": 3,
+          "unit_price_egp": 230,
+          "line_total_egp": 690
+        }
+      ],
+      "subtotal_egp": 34370,
+      "tax_rate": 0.14,
+      "tax_egp": 4811.8,
+      "total_egp": 39181.8,
+      "invoice_iban": "EG00TEST070926049371",
+      "synthetic_only": true
+    },
+    {
+      "id": "STRESS-007",
+      "file": "STRESS-007.pdf",
+      "language": "ar",
+      "layout_variant": 2,
+      "quality_tier": "hard",
+      "simulated_rotation_degrees": 0.42,
+      "vendor_name_ar": "شركة السنبلة للتجارة",
+      "vendor_name_en": "Sunbulah Trading",
+      "invoice_number": "SYN-2026007",
+      "invoice_date": "2026-02-13",
+      "purchase_order": "PO-42006",
+      "tax_id": "SYNTH-REG-000873",
+      "currency": "EGP",
+      "line_items": [
+        {
+          "description_ar": "أدوات مكتبية",
+          "description_en": "Office supplies",
+          "quantity": 1,
+          "unit_price_egp": 230,
+          "line_total_egp": 230
+        },
+        {
+          "description_ar": "حبر طابعة",
+          "description_en": "Printer toner",
+          "quantity": 2,
+          "unit_price_egp": 640,
+          "line_total_egp": 1280
+        },
+        {
+          "description_ar": "خدمة صيانة",
+          "description_en": "Maintenance service",
+          "quantity": 3,
+          "unit_price_egp": 1250,
+          "line_total_egp": 3750
+        },
+        {
+          "description_ar": "مواد تعبئة",
+          "description_en": "Packaging materials",
+          "quantity": 4,
+          "unit_price_egp": 315,
+          "line_total_egp": 1260
+        }
+      ],
+      "subtotal_egp": 6520,
+      "tax_rate": 0.14,
+      "tax_egp": 912.8,
+      "total_egp": 7432.8,
+      "invoice_iban": "EG00TEST010498641969",
+      "synthetic_only": true
+    },
+    {
+      "id": "STRESS-008",
+      "file": "STRESS-008.pdf",
+      "language": "en",
+      "layout_variant": 2,
+      "quality_tier": "clean",
+      "simulated_rotation_degrees": 0,
+      "vendor_name_ar": "شركة المشرق للتوريد",
+      "vendor_name_en": "Mashreq Supply Co.",
+      "invoice_number": "SYN-2026008",
+      "invoice_date": "2026-02-15",
+      "purchase_order": "PO-42007",
+      "tax_id": "SYNTH-REG-003492",
+      "currency": "EGP",
+      "line_items": [
+        {
+          "description_ar": "خدمات استشارية",
+          "description_en": "Consulting services",
+          "quantity": 2,
+          "unit_price_egp": 1800,
+          "line_total_egp": 3600
+        },
+        {
+          "description_ar": "قطع غيار",
+          "description_en": "Replacement parts",
+          "quantity": 3,
+          "unit_price_egp": 920,
+          "line_total_egp": 2760
+        },
+        {
+          "description_ar": "خدمات نقل",
+          "description_en": "Transport service",
+          "quantity": 4,
+          "unit_price_egp": 780,
+          "line_total_egp": 3120
+        },
+        {
+          "description_ar": "أدوات مكتبية",
+          "description_en": "Office supplies",
+          "quantity": 5,
+          "unit_price_egp": 230,
+          "line_total_egp": 1150
+        },
+        {
+          "description_ar": "حبر طابعة",
+          "description_en": "Printer toner",
+          "quantity": 6,
+          "unit_price_egp": 640,
+          "line_total_egp": 3840
+        }
+      ],
+      "subtotal_egp": 14470,
+      "tax_rate": 0.14,
+      "tax_egp": 2025.8,
+      "total_egp": 16495.8,
+      "invoice_iban": "EG00TEST040712345670",
+      "synthetic_only": true
+    },
+    {
+      "id": "STRESS-009",
+      "file": "STRESS-009.pdf",
+      "language": "mixed",
+      "layout_variant": 2,
+      "quality_tier": "moderate",
+      "simulated_rotation_degrees": 0.96,
+      "vendor_name_ar": "شركة الواحة للنقل",
+      "vendor_name_en": "Oasis Transport",
+      "invoice_number": "SYN-2026009",
+      "invoice_date": "2026-02-17",
+      "purchase_order": "PO-42008",
+      "tax_id": "SYNTH-REG-006111",
+      "currency": "EGP",
+      "line_items": [
+        {
+          "description_ar": "ورق تصوير A4",
+          "description_en": "A4 copier paper",
+          "quantity": 3,
+          "unit_price_egp": 175,
+          "line_total_egp": 525
+        }
+      ],
+      "subtotal_egp": 525,
+      "tax_rate": 0.14,
+      "tax_egp": 73.5,
+      "total_egp": 598.5,
+      "invoice_iban": "EG00TEST070926049371",
+      "synthetic_only": true
+    },
+    {
+      "id": "STRESS-010",
+      "file": "STRESS-010.pdf",
+      "language": "ar",
+      "layout_variant": 3,
+      "quality_tier": "clean",
+      "simulated_rotation_degrees": 0,
+      "vendor_name_ar": "شركة السنبلة للتجارة",
+      "vendor_name_en": "Sunbulah Trading",
+      "invoice_number": "SYN-2026010",
+      "invoice_date": "2026-02-19",
+      "purchase_order": "PO-42009",
+      "tax_id": "SYNTH-REG-000873",
+      "currency": "EGP",
+      "line_items": [
+        {
+          "description_ar": "قطع غيار",
+          "description_en": "Replacement parts",
+          "quantity": 5,
+          "unit_price_egp": 920,
+          "line_total_egp": 4600
+        }
+      ],
+      "subtotal_egp": 4600,
+      "tax_rate": 0.14,
+      "tax_egp": 644.0,
+      "total_egp": 5244.0,
+      "invoice_iban": "EG00TEST010498641969",
+      "synthetic_only": true
+    },
+    {
+      "id": "STRESS-011",
+      "file": "STRESS-011.pdf",
+      "language": "en",
+      "layout_variant": 3,
+      "quality_tier": "moderate",
+      "simulated_rotation_degrees": 0.15,
+      "vendor_name_ar": "شركة المشرق للتوريد",
+      "vendor_name_en": "Mashreq Supply Co.",
+      "invoice_number": "SYN-2026011",
+      "invoice_date": "2026-02-21",
+      "purchase_order": "PO-42010",
+      "tax_id": "SYNTH-REG-003492",
+      "currency": "EGP",
+      "line_items": [
+        {
+          "description_ar": "مياه شرب (عبوات)",
+          "description_en": "Bottled drinking water",
+          "quantity": 6,
+          "unit_price_egp": 85,
+          "line_total_egp": 510
+        },
+        {
+          "description_ar": "معدات شبكات",
+          "description_en": "Network equipment",
+          "quantity": 7,
+          "unit_price_egp": 2400,
+          "line_total_egp": 16800
+        }
+      ],
+      "subtotal_egp": 17310,
+      "tax_rate": 0.14,
+      "tax_egp": 2423.4,
+      "total_egp": 19733.4,
+      "invoice_iban": "EG00TEST040712345670",
+      "synthetic_only": true
+    },
+    {
+      "id": "STRESS-012",
+      "file": "STRESS-012.pdf",
+      "language": "mixed",
+      "layout_variant": 3,
+      "quality_tier": "hard",
+      "simulated_rotation_degrees": -0.42,
+      "vendor_name_ar": "شركة الواحة للنقل",
+      "vendor_name_en": "Oasis Transport",
+      "invoice_number": "SYN-2026012",
+      "invoice_date": "2026-02-23",
+      "purchase_order": "PO-42011",
+      "tax_id": "SYNTH-REG-006111",
+      "currency": "EGP",
+      "line_items": [
+        {
+          "description_ar": "خدمة صيانة",
+          "description_en": "Maintenance service",
+          "quantity": 7,
+          "unit_price_egp": 1250,
+          "line_total_egp": 8750
+        },
+        {
+          "description_ar": "مواد تعبئة",
+          "description_en": "Packaging materials",
+          "quantity": 8,
+          "unit_price_egp": 315,
+          "line_total_egp": 2520
+        },
+        {
+          "description_ar": "ورق تصوير A4",
+          "description_en": "A4 copier paper",
+          "quantity": 1,
+          "unit_price_egp": 175,
+          "line_total_egp": 175
+        }
+      ],
+      "subtotal_egp": 11445,
+      "tax_rate": 0.14,
+      "tax_egp": 1602.3,
+      "total_egp": 13047.3,
+      "invoice_iban": "EG00TEST070926049371",
+      "synthetic_only": true
+    },
+    {
+      "id": "STRESS-013",
+      "file": "STRESS-013.pdf",
+      "language": "ar",
+      "layout_variant": 4,
+      "quality_tier": "moderate",
+      "simulated_rotation_degrees": 0.69,
+      "vendor_name_ar": "شركة السنبلة للتجارة",
+      "vendor_name_en": "Sunbulah Trading",
+      "invoice_number": "SYN-2026013",
+      "invoice_date": "2026-02-25",
+      "purchase_order": "PO-42012",
+      "tax_id": "SYNTH-REG-000873",
+      "currency": "EGP",
+      "line_items": [
+        {
+          "description_ar": "معدات شبكات",
+          "description_en": "Network equipment",
+          "quantity": 1,
+          "unit_price_egp": 2400,
+          "line_total_egp": 2400
+        },
+        {
+          "description_ar": "خدمات استشارية",
+          "description_en": "Consulting services",
+          "quantity": 2,
+          "unit_price_egp": 1800,
+          "line_total_egp": 3600
+        }
+      ],
+      "subtotal_egp": 6000,
+      "tax_rate": 0.14,
+      "tax_egp": 840.0,
+      "total_egp": 6840.0,
+      "invoice_iban": "EG00TEST010498641969",
+      "synthetic_only": true
+    },
+    {
+      "id": "STRESS-014",
+      "file": "STRESS-014.pdf",
+      "language": "en",
+      "layout_variant": 4,
+      "quality_tier": "hard",
+      "simulated_rotation_degrees": -0.96,
+      "vendor_name_ar": "شركة المشرق للتوريد",
+      "vendor_name_en": "Mashreq Supply Co.",
+      "invoice_number": "SYN-2026014",
+      "invoice_date": "2026-02-27",
+      "purchase_order": "PO-42013",
+      "tax_id": "SYNTH-REG-003492",
+      "currency": "EGP",
+      "line_items": [
+        {
+          "description_ar": "مواد تعبئة",
+          "description_en": "Packaging materials",
+          "quantity": 2,
+          "unit_price_egp": 315,
+          "line_total_egp": 630
+        }
+      ],
+      "subtotal_egp": 630,
+      "tax_rate": 0.14,
+      "tax_egp": 88.2,
+      "total_egp": 718.2,
+      "invoice_iban": "EG00TEST040712345670",
+      "synthetic_only": true
+    },
+    {
+      "id": "STRESS-015",
+      "file": "STRESS-015.pdf",
+      "language": "mixed",
+      "layout_variant": 4,
+      "quality_tier": "clean",
+      "simulated_rotation_degrees": 0,
+      "vendor_name_ar": "شركة الواحة للنقل",
+      "vendor_name_en": "Oasis Transport",
+      "invoice_number": "SYN-2026015",
+      "invoice_date": "2026-03-01",
+      "purchase_order": "PO-42014",
+      "tax_id": "SYNTH-REG-006111",
+      "currency": "EGP",
+      "line_items": [
+        {
+          "description_ar": "أدوات مكتبية",
+          "description_en": "Office supplies",
+          "quantity": 3,
+          "unit_price_egp": 230,
+          "line_total_egp": 690
+        },
+        {
+          "description_ar": "حبر طابعة",
+          "description_en": "Printer toner",
+          "quantity": 4,
+          "unit_price_egp": 640,
+          "line_total_egp": 2560
+        },
+        {
+          "description_ar": "خدمة صيانة",
+          "description_en": "Maintenance service",
+          "quantity": 5,
+          "unit_price_egp": 1250,
+          "line_total_egp": 6250
+        },
+        {
+          "description_ar": "مواد تعبئة",
+          "description_en": "Packaging materials",
+          "quantity": 6,
+          "unit_price_egp": 315,
+          "line_total_egp": 1890
+        }
+      ],
+      "subtotal_egp": 11390,
+      "tax_rate": 0.14,
+      "tax_egp": 1594.6,
+      "total_egp": 12984.6,
+      "invoice_iban": "EG00TEST070926049371",
+      "synthetic_only": true
+    },
+    {
+      "id": "STRESS-016",
+      "file": "STRESS-016.pdf",
+      "language": "ar",
+      "layout_variant": 5,
+      "quality_tier": "hard",
+      "simulated_rotation_degrees": -0.15,
+      "vendor_name_ar": "شركة السنبلة للتجارة",
+      "vendor_name_en": "Sunbulah Trading",
+      "invoice_number": "SYN-2026016",
+      "invoice_date": "2026-03-03",
+      "purchase_order": "PO-42015",
+      "tax_id": "SYNTH-REG-000873",
+      "currency": "EGP",
+      "line_items": [
+        {
+          "description_ar": "ورق تصوير A4",
+          "description_en": "A4 copier paper",
+          "quantity": 5,
+          "unit_price_egp": 175,
+          "line_total_egp": 875
+        },
+        {
+          "description_ar": "مياه شرب (عبوات)",
+          "description_en": "Bottled drinking water",
+          "quantity": 6,
+          "unit_price_egp": 85,
+          "line_total_egp": 510
+        },
+        {
+          "description_ar": "معدات شبكات",
+          "description_en": "Network equipment",
+          "quantity": 7,
+          "unit_price_egp": 2400,
+          "line_total_egp": 16800
+        }
+      ],
+      "subtotal_egp": 18185,
+      "tax_rate": 0.14,
+      "tax_egp": 2545.9,
+      "total_egp": 20730.9,
+      "invoice_iban": "EG00TEST010498641969",
+      "synthetic_only": true
+    },
+    {
+      "id": "STRESS-017",
+      "file": "STRESS-017.pdf",
+      "language": "en",
+      "layout_variant": 5,
+      "quality_tier": "clean",
+      "simulated_rotation_degrees": 0,
+      "vendor_name_ar": "شركة المشرق للتوريد",
+      "vendor_name_en": "Mashreq Supply Co.",
+      "invoice_number": "SYN-2026017",
+      "invoice_date": "2026-03-05",
+      "purchase_order": "PO-42016",
+      "tax_id": "SYNTH-REG-003492",
+      "currency": "EGP",
+      "line_items": [
+        {
+          "description_ar": "حبر طابعة",
+          "description_en": "Printer toner",
+          "quantity": 6,
+          "unit_price_egp": 640,
+          "line_total_egp": 3840
+        },
+        {
+          "description_ar": "خدمة صيانة",
+          "description_en": "Maintenance service",
+          "quantity": 7,
+          "unit_price_egp": 1250,
+          "line_total_egp": 8750
+        },
+        {
+          "description_ar": "مواد تعبئة",
+          "description_en": "Packaging materials",
+          "quantity": 8,
+          "unit_price_egp": 315,
+          "line_total_egp": 2520
+        },
+        {
+          "description_ar": "ورق تصوير A4",
+          "description_en": "A4 copier paper",
+          "quantity": 1,
+          "unit_price_egp": 175,
+          "line_total_egp": 175
+        }
+      ],
+      "subtotal_egp": 15285,
+      "tax_rate": 0.14,
+      "tax_egp": 2139.9,
+      "total_egp": 17424.9,
+      "invoice_iban": "EG00TEST040712345670",
+      "synthetic_only": true
+    },
+    {
+      "id": "STRESS-018",
+      "file": "STRESS-018.pdf",
+      "language": "mixed",
+      "layout_variant": 5,
+      "quality_tier": "moderate",
+      "simulated_rotation_degrees": -0.69,
+      "vendor_name_ar": "شركة الواحة للنقل",
+      "vendor_name_en": "Oasis Transport",
+      "invoice_number": "SYN-2026018",
+      "invoice_date": "2026-03-07",
+      "purchase_order": "PO-42017",
+      "tax_id": "SYNTH-REG-006111",
+      "currency": "EGP",
+      "line_items": [
+        {
+          "description_ar": "قطع غيار",
+          "description_en": "Replacement parts",
+          "quantity": 7,
+          "unit_price_egp": 920,
+          "line_total_egp": 6440
+        }
+      ],
+      "subtotal_egp": 6440,
+      "tax_rate": 0.14,
+      "tax_egp": 901.6,
+      "total_egp": 7341.6,
+      "invoice_iban": "EG00TEST070926049371",
+      "synthetic_only": true
+    },
+    {
+      "id": "STRESS-019",
+      "file": "STRESS-019.pdf",
+      "language": "ar",
+      "layout_variant": 6,
+      "quality_tier": "clean",
+      "simulated_rotation_degrees": 0,
+      "vendor_name_ar": "شركة السنبلة للتجارة",
+      "vendor_name_en": "Sunbulah Trading",
+      "invoice_number": "SYN-2026019",
+      "invoice_date": "2026-03-09",
+      "purchase_order": "PO-42018",
+      "tax_id": "SYNTH-REG-000873",
+      "currency": "EGP",
+      "line_items": [
+        {
+          "description_ar": "خدمة صيانة",
+          "description_en": "Maintenance service",
+          "quantity": 1,
+          "unit_price_egp": 1250,
+          "line_total_egp": 1250
+        }
+      ],
+      "subtotal_egp": 1250,
+      "tax_rate": 0.14,
+      "tax_egp": 175.0,
+      "total_egp": 1425.0,
+      "invoice_iban": "EG00TEST010498641969",
+      "synthetic_only": true
+    },
+    {
+      "id": "STRESS-020",
+      "file": "STRESS-020.pdf",
+      "language": "en",
+      "layout_variant": 6,
+      "quality_tier": "moderate",
+      "simulated_rotation_degrees": -1.23,
+      "vendor_name_ar": "شركة المشرق للتوريد",
+      "vendor_name_en": "Mashreq Supply Co.",
+      "invoice_number": "SYN-2026020",
+      "invoice_date": "2026-03-11",
+      "purchase_order": "PO-42019",
+      "tax_id": "SYNTH-REG-003492",
+      "currency": "EGP",
+      "line_items": [
+        {
+          "description_ar": "خدمات نقل",
+          "description_en": "Transport service",
+          "quantity": 2,
+          "unit_price_egp": 780,
+          "line_total_egp": 1560
+        },
+        {
+          "description_ar": "أدوات مكتبية",
+          "description_en": "Office supplies",
+          "quantity": 3,
+          "unit_price_egp": 230,
+          "line_total_egp": 690
+        },
+        {
+          "description_ar": "حبر طابعة",
+          "description_en": "Printer toner",
+          "quantity": 4,
+          "unit_price_egp": 640,
+          "line_total_egp": 2560
+        },
+        {
+          "description_ar": "خدمة صيانة",
+          "description_en": "Maintenance service",
+          "quantity": 5,
+          "unit_price_egp": 1250,
+          "line_total_egp": 6250
+        },
+        {
+          "description_ar": "مواد تعبئة",
+          "description_en": "Packaging materials",
+          "quantity": 6,
+          "unit_price_egp": 315,
+          "line_total_egp": 1890
+        }
+      ],
+      "subtotal_egp": 12950,
+      "tax_rate": 0.14,
+      "tax_egp": 1813.0,
+      "total_egp": 14763.0,
+      "invoice_iban": "EG00TEST040712345670",
+      "synthetic_only": true
+    },
+    {
+      "id": "STRESS-021",
+      "file": "STRESS-021.pdf",
+      "language": "mixed",
+      "layout_variant": 6,
+      "quality_tier": "hard",
+      "simulated_rotation_degrees": 0.15,
+      "vendor_name_ar": "شركة الواحة للنقل",
+      "vendor_name_en": "Oasis Transport",
+      "invoice_number": "SYN-2026021",
+      "invoice_date": "2026-03-13",
+      "purchase_order": "PO-42020",
+      "tax_id": "SYNTH-REG-006111",
+      "currency": "EGP",
+      "line_items": [
+        {
+          "description_ar": "معدات شبكات",
+          "description_en": "Network equipment",
+          "quantity": 3,
+          "unit_price_egp": 2400,
+          "line_total_egp": 7200
+        },
+        {
+          "description_ar": "خدمات استشارية",
+          "description_en": "Consulting services",
+          "quantity": 4,
+          "unit_price_egp": 1800,
+          "line_total_egp": 7200
+        }
+      ],
+      "subtotal_egp": 14400,
+      "tax_rate": 0.14,
+      "tax_egp": 2016.0,
+      "total_egp": 16416.0,
+      "invoice_iban": "EG00TEST070926049371",
+      "synthetic_only": true
+    },
+    {
+      "id": "STRESS-022",
+      "file": "STRESS-022.pdf",
+      "language": "ar",
+      "layout_variant": 7,
+      "quality_tier": "moderate",
+      "simulated_rotation_degrees": -0.42,
+      "vendor_name_ar": "شركة السنبلة للتجارة",
+      "vendor_name_en": "Sunbulah Trading",
+      "invoice_number": "SYN-2026022",
+      "invoice_date": "2026-03-15",
+      "purchase_order": "PO-42021",
+      "tax_id": "SYNTH-REG-000873",
+      "currency": "EGP",
+      "line_items": [
+        {
+          "description_ar": "أدوات مكتبية",
+          "description_en": "Office supplies",
+          "quantity": 5,
+          "unit_price_egp": 230,
+          "line_total_egp": 1150
+        },
+        {
+          "description_ar": "حبر طابعة",
+          "description_en": "Printer toner",
+          "quantity": 6,
+          "unit_price_egp": 640,
+          "line_total_egp": 3840
+        },
+        {
+          "description_ar": "خدمة صيانة",
+          "description_en": "Maintenance service",
+          "quantity": 7,
+          "unit_price_egp": 1250,
+          "line_total_egp": 8750
+        },
+        {
+          "description_ar": "مواد تعبئة",
+          "description_en": "Packaging materials",
+          "quantity": 8,
+          "unit_price_egp": 315,
+          "line_total_egp": 2520
+        },
+        {
+          "description_ar": "ورق تصوير A4",
+          "description_en": "A4 copier paper",
+          "quantity": 1,
+          "unit_price_egp": 175,
+          "line_total_egp": 175
+        }
+      ],
+      "subtotal_egp": 16435,
+      "tax_rate": 0.14,
+      "tax_egp": 2300.9,
+      "total_egp": 18735.9,
+      "invoice_iban": "EG00TEST010498641969",
+      "synthetic_only": true
+    },
+    {
+      "id": "STRESS-023",
+      "file": "STRESS-023.pdf",
+      "language": "en",
+      "layout_variant": 7,
+      "quality_tier": "hard",
+      "simulated_rotation_degrees": 0.69,
+      "vendor_name_ar": "شركة المشرق للتوريد",
+      "vendor_name_en": "Mashreq Supply Co.",
+      "invoice_number": "SYN-2026023",
+      "invoice_date": "2026-03-17",
+      "purchase_order": "PO-42022",
+      "tax_id": "SYNTH-REG-003492",
+      "currency": "EGP",
+      "line_items": [
+        {
+          "description_ar": "خدمات استشارية",
+          "description_en": "Consulting services",
+          "quantity": 6,
+          "unit_price_egp": 1800,
+          "line_total_egp": 10800
+        }
+      ],
+      "subtotal_egp": 10800,
+      "tax_rate": 0.14,
+      "tax_egp": 1512.0,
+      "total_egp": 12312.0,
+      "invoice_iban": "EG00TEST040712345670",
+      "synthetic_only": true
+    },
+    {
+      "id": "STRESS-024",
+      "file": "STRESS-024.pdf",
+      "language": "mixed",
+      "layout_variant": 7,
+      "quality_tier": "clean",
+      "simulated_rotation_degrees": 0,
+      "vendor_name_ar": "شركة الواحة للنقل",
+      "vendor_name_en": "Oasis Transport",
+      "invoice_number": "SYN-2026024",
+      "invoice_date": "2026-03-19",
+      "purchase_order": "PO-42023",
+      "tax_id": "SYNTH-REG-006111",
+      "currency": "EGP",
+      "line_items": [
+        {
+          "description_ar": "ورق تصوير A4",
+          "description_en": "A4 copier paper",
+          "quantity": 7,
+          "unit_price_egp": 175,
+          "line_total_egp": 1225
+        },
+        {
+          "description_ar": "مياه شرب (عبوات)",
+          "description_en": "Bottled drinking water",
+          "quantity": 8,
+          "unit_price_egp": 85,
+          "line_total_egp": 680
+        },
+        {
+          "description_ar": "معدات شبكات",
+          "description_en": "Network equipment",
+          "quantity": 1,
+          "unit_price_egp": 2400,
+          "line_total_egp": 2400
+        }
+      ],
+      "subtotal_egp": 4305,
+      "tax_rate": 0.14,
+      "tax_egp": 602.7,
+      "total_egp": 4907.7,
+      "invoice_iban": "EG00TEST070926049371",
+      "synthetic_only": true
+    },
+    {
+      "id": "STRESS-025",
+      "file": "STRESS-025.pdf",
+      "language": "ar",
+      "layout_variant": 8,
+      "quality_tier": "hard",
+      "simulated_rotation_degrees": 1.23,
+      "vendor_name_ar": "شركة السنبلة للتجارة",
+      "vendor_name_en": "Sunbulah Trading",
+      "invoice_number": "SYN-2026025",
+      "invoice_date": "2026-03-21",
+      "purchase_order": "PO-42024",
+      "tax_id": "SYNTH-REG-000873",
+      "currency": "EGP",
+      "line_items": [
+        {
+          "description_ar": "قطع غيار",
+          "description_en": "Replacement parts",
+          "quantity": 1,
+          "unit_price_egp": 920,
+          "line_total_egp": 920
+        },
+        {
+          "description_ar": "خدمات نقل",
+          "description_en": "Transport service",
+          "quantity": 2,
+          "unit_price_egp": 780,
+          "line_total_egp": 1560
+        }
+      ],
+      "subtotal_egp": 2480,
+      "tax_rate": 0.14,
+      "tax_egp": 347.2,
+      "total_egp": 2827.2,
+      "invoice_iban": "EG00TEST010498641969",
+      "synthetic_only": true
+    },
+    {
+      "id": "STRESS-026",
+      "file": "STRESS-026.pdf",
+      "language": "en",
+      "layout_variant": 8,
+      "quality_tier": "clean",
+      "simulated_rotation_degrees": 0,
+      "vendor_name_ar": "شركة المشرق للتوريد",
+      "vendor_name_en": "Mashreq Supply Co.",
+      "invoice_number": "SYN-2026026",
+      "invoice_date": "2026-03-23",
+      "purchase_order": "PO-42025",
+      "tax_id": "SYNTH-REG-003492",
+      "currency": "EGP",
+      "line_items": [
+        {
+          "description_ar": "مياه شرب (عبوات)",
+          "description_en": "Bottled drinking water",
+          "quantity": 2,
+          "unit_price_egp": 85,
+          "line_total_egp": 170
+        },
+        {
+          "description_ar": "معدات شبكات",
+          "description_en": "Network equipment",
+          "quantity": 3,
+          "unit_price_egp": 2400,
+          "line_total_egp": 7200
+        },
+        {
+          "description_ar": "خدمات استشارية",
+          "description_en": "Consulting services",
+          "quantity": 4,
+          "unit_price_egp": 1800,
+          "line_total_egp": 7200
+        }
+      ],
+      "subtotal_egp": 14570,
+      "tax_rate": 0.14,
+      "tax_egp": 2039.8,
+      "total_egp": 16609.8,
+      "invoice_iban": "EG00TEST040712345670",
+      "synthetic_only": true
+    },
+    {
+      "id": "STRESS-027",
+      "file": "STRESS-027.pdf",
+      "language": "mixed",
+      "layout_variant": 8,
+      "quality_tier": "moderate",
+      "simulated_rotation_degrees": 0.42,
+      "vendor_name_ar": "شركة الواحة للنقل",
+      "vendor_name_en": "Oasis Transport",
+      "invoice_number": "SYN-2026027",
+      "invoice_date": "2026-03-25",
+      "purchase_order": "PO-42026",
+      "tax_id": "SYNTH-REG-006111",
+      "currency": "EGP",
+      "line_items": [
+        {
+          "description_ar": "خدمة صيانة",
+          "description_en": "Maintenance service",
+          "quantity": 3,
+          "unit_price_egp": 1250,
+          "line_total_egp": 3750
+        }
+      ],
+      "subtotal_egp": 3750,
+      "tax_rate": 0.14,
+      "tax_egp": 525.0,
+      "total_egp": 4275.0,
+      "invoice_iban": "EG00TEST070926049371",
+      "synthetic_only": true
+    },
+    {
+      "id": "STRESS-028",
+      "file": "STRESS-028.pdf",
+      "language": "ar",
+      "layout_variant": 9,
+      "quality_tier": "clean",
+      "simulated_rotation_degrees": 0,
+      "vendor_name_ar": "شركة السنبلة للتجارة",
+      "vendor_name_en": "Sunbulah Trading",
+      "invoice_number": "SYN-2026028",
+      "invoice_date": "2026-03-27",
+      "purchase_order": "PO-42027",
+      "tax_id": "SYNTH-REG-000873",
+      "currency": "EGP",
+      "line_items": [
+        {
+          "description_ar": "معدات شبكات",
+          "description_en": "Network equipment",
+          "quantity": 5,
+          "unit_price_egp": 2400,
+          "line_total_egp": 12000
+        }
+      ],
+      "subtotal_egp": 12000,
+      "tax_rate": 0.14,
+      "tax_egp": 1680.0,
+      "total_egp": 13680.0,
+      "invoice_iban": "EG00TEST010498641969",
+      "synthetic_only": true
+    },
+    {
+      "id": "STRESS-029",
+      "file": "STRESS-029.pdf",
+      "language": "en",
+      "layout_variant": 9,
+      "quality_tier": "moderate",
+      "simulated_rotation_degrees": 0.96,
+      "vendor_name_ar": "شركة المشرق للتوريد",
+      "vendor_name_en": "Mashreq Supply Co.",
+      "invoice_number": "SYN-2026029",
+      "invoice_date": "2026-03-29",
+      "purchase_order": "PO-42028",
+      "tax_id": "SYNTH-REG-003492",
+      "currency": "EGP",
+      "line_items": [
+        {
+          "description_ar": "مواد تعبئة",
+          "description_en": "Packaging materials",
+          "quantity": 6,
+          "unit_price_egp": 315,
+          "line_total_egp": 1890
+        },
+        {
+          "description_ar": "ورق تصوير A4",
+          "description_en": "A4 copier paper",
+          "quantity": 7,
+          "unit_price_egp": 175,
+          "line_total_egp": 1225
+        },
+        {
+          "description_ar": "مياه شرب (عبوات)",
+          "description_en": "Bottled drinking water",
+          "quantity": 8,
+          "unit_price_egp": 85,
+          "line_total_egp": 680
+        },
+        {
+          "description_ar": "معدات شبكات",
+          "description_en": "Network equipment",
+          "quantity": 1,
+          "unit_price_egp": 2400,
+          "line_total_egp": 2400
+        }
+      ],
+      "subtotal_egp": 6195,
+      "tax_rate": 0.14,
+      "tax_egp": 867.3,
+      "total_egp": 7062.3,
+      "invoice_iban": "EG00TEST040712345670",
+      "synthetic_only": true
+    },
+    {
+      "id": "STRESS-030",
+      "file": "STRESS-030.pdf",
+      "language": "mixed",
+      "layout_variant": 9,
+      "quality_tier": "hard",
+      "simulated_rotation_degrees": -1.23,
+      "vendor_name_ar": "شركة الواحة للنقل",
+      "vendor_name_en": "Oasis Transport",
+      "invoice_number": "SYN-2026030",
+      "invoice_date": "2026-03-31",
+      "purchase_order": "PO-42029",
+      "tax_id": "SYNTH-REG-006111",
+      "currency": "EGP",
+      "line_items": [
+        {
+          "description_ar": "أدوات مكتبية",
+          "description_en": "Office supplies",
+          "quantity": 7,
+          "unit_price_egp": 230,
+          "line_total_egp": 1610
+        },
+        {
+          "description_ar": "حبر طابعة",
+          "description_en": "Printer toner",
+          "quantity": 8,
+          "unit_price_egp": 640,
+          "line_total_egp": 5120
+        },
+        {
+          "description_ar": "خدمة صيانة",
+          "description_en": "Maintenance service",
+          "quantity": 1,
+          "unit_price_egp": 1250,
+          "line_total_egp": 1250
+        },
+        {
+          "description_ar": "مواد تعبئة",
+          "description_en": "Packaging materials",
+          "quantity": 2,
+          "unit_price_egp": 315,
+          "line_total_egp": 630
+        },
+        {
+          "description_ar": "ورق تصوير A4",
+          "description_en": "A4 copier paper",
+          "quantity": 3,
+          "unit_price_egp": 175,
+          "line_total_egp": 525
+        }
+      ],
+      "subtotal_egp": 9135,
+      "tax_rate": 0.14,
+      "tax_egp": 1278.9,
+      "total_egp": 10413.9,
+      "invoice_iban": "EG00TEST070926049371",
+      "synthetic_only": true
+    }
+  ]
+}
