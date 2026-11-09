@@ -1,9 +1,10 @@
 from datetime import datetime
+from decimal import Decimal
 
 from pydantic import BaseModel, Field
 
 from .actions import ProposedAction
-from .common import Decision, Role
+from .common import ApprovalStatus, Decision, InvoiceStatus, Role
 
 
 class AuthorizeRequest(BaseModel):
@@ -28,6 +29,8 @@ class ApprovalRequest(BaseModel):
     approver_id: int
     approve: bool
     comment: str = Field(default="", max_length=500)
+    approver_role: Role | None = Field(default=None, description="Set by the api from the session; gateway BLOCKs if missing")
+    company_id: int | None = Field(default=None, description="Set by the api from the session; gateway BLOCKs if missing")
 
 
 class ApprovalRecord(BaseModel):
@@ -36,3 +39,38 @@ class ApprovalRecord(BaseModel):
     approve: bool
     hmac_signature: str
     signed_at: datetime
+
+
+class PaymentRequestInfo(BaseModel):
+    """Read model served by the api (GET /v1/payment-requests/{id}); the gateway never reads api tables."""
+
+    id: int
+    company_id: int
+    creator_id: int
+    invoice_id: int
+    vendor_id: int
+    amount: Decimal
+    currency: str = Field(pattern=r"^[A-Z]{3}$")
+    status: InvoiceStatus
+    created_at: datetime
+
+
+class ApprovalResult(BaseModel):
+    payment_request_id: int
+    status: ApprovalStatus
+    approvals_received: int = Field(ge=0)
+    approvals_required: int = Field(ge=0)
+    reasons: list[str] = Field(default_factory=list)
+    audit_entry_id: int | None = None
+
+
+class ExecuteCheckRequest(BaseModel):
+    payment_request_id: int
+    requested_by: int
+    company_id: int
+
+
+class ExecuteCheckResult(BaseModel):
+    allowed: bool
+    reasons: list[str] = Field(default_factory=list)
+    audit_entry_id: int | None = None

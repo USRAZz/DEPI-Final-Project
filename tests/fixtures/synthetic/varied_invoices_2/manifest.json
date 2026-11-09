@@ -1,0 +1,1278 @@
+{
+  "dataset": "SecureFin Varied Synthetic Invoice OCR Set - Batch 2",
+  "version": "1.0",
+  "count": 30,
+  "synthetic_only": true,
+  "license": "CC0-1.0",
+  "languages": {
+    "ar": 10,
+    "en": 10,
+    "mixed": 10
+  },
+  "quality_tiers": {
+    "clean": 10,
+    "moderate": 10,
+    "hard": 10
+  },
+  "layout_count": 10,
+  "notes": "Some pages are intentionally low contrast, skewed, blurred, downsampled, and JPEG-compressed. The quality_tier field indicates the intended difficulty.",
+  "records": [
+    {
+      "id": "STRESS2-001",
+      "file": "STRESS2-001.pdf",
+      "language": "ar",
+      "layout_variant": 0,
+      "quality_tier": "clean",
+      "simulated_rotation_degrees": 0,
+      "vendor_name_ar": "شركة المدار للمقاولات",
+      "vendor_name_en": "Madar Contracting Co.",
+      "invoice_number": "SYN2-2026001",
+      "invoice_date": "2026-05-01",
+      "purchase_order": "PO-242000",
+      "tax_id": "SYNTH-REG-009603",
+      "currency": "EGP",
+      "line_items": [
+        {
+          "description_ar": "أحبار وأدوات طباعة",
+          "description_en": "Ink and printing supplies",
+          "quantity": 1,
+          "unit_price_egp": 520,
+          "line_total_egp": 520
+        }
+      ],
+      "subtotal_egp": 520,
+      "tax_rate": 0.14,
+      "tax_egp": 72.8,
+      "total_egp": 592.8,
+      "invoice_iban": "EG00TEST111210987639",
+      "synthetic_only": true
+    },
+    {
+      "id": "STRESS2-002",
+      "file": "STRESS2-002.pdf",
+      "language": "en",
+      "layout_variant": 0,
+      "quality_tier": "moderate",
+      "simulated_rotation_degrees": -0.42,
+      "vendor_name_ar": "المصرية للتوريدات",
+      "vendor_name_en": "Egyptian Supplies",
+      "invoice_number": "SYN2-2026002",
+      "invoice_date": "2026-05-03",
+      "purchase_order": "PO-242001",
+      "tax_id": "SYNTH-REG-012222",
+      "currency": "EGP",
+      "line_items": [
+        {
+          "description_ar": "خدمة تركيب",
+          "description_en": "Installation service",
+          "quantity": 2,
+          "unit_price_egp": 1450,
+          "line_total_egp": 2900
+        },
+        {
+          "description_ar": "اشتراك برمجي",
+          "description_en": "Software subscription",
+          "quantity": 3,
+          "unit_price_egp": 2100,
+          "line_total_egp": 6300
+        },
+        {
+          "description_ar": "مستلزمات تغليف",
+          "description_en": "Wrapping supplies",
+          "quantity": 4,
+          "unit_price_egp": 185,
+          "line_total_egp": 740
+        }
+      ],
+      "subtotal_egp": 9940,
+      "tax_rate": 0.14,
+      "tax_egp": 1391.6,
+      "total_egp": 11331.6,
+      "invoice_iban": "EG00TEST141424691340",
+      "synthetic_only": true
+    },
+    {
+      "id": "STRESS2-003",
+      "file": "STRESS2-003.pdf",
+      "language": "mixed",
+      "layout_variant": 0,
+      "quality_tier": "hard",
+      "simulated_rotation_degrees": 0.69,
+      "vendor_name_ar": "مؤسسة بداية للطباعة",
+      "vendor_name_en": "Bedaya Printing Est.",
+      "invoice_number": "SYN2-2026003",
+      "invoice_date": "2026-05-05",
+      "purchase_order": "PO-242002",
+      "tax_id": "SYNTH-REG-014841",
+      "currency": "EGP",
+      "line_items": [
+        {
+          "description_ar": "معدات سلامة",
+          "description_en": "Safety equipment",
+          "quantity": 3,
+          "unit_price_egp": 390,
+          "line_total_egp": 1170
+        },
+        {
+          "description_ar": "خدمة توصيل",
+          "description_en": "Delivery service",
+          "quantity": 4,
+          "unit_price_egp": 260,
+          "line_total_egp": 1040
+        },
+        {
+          "description_ar": "تدريب فني",
+          "description_en": "Technical training",
+          "quantity": 5,
+          "unit_price_egp": 2300,
+          "line_total_egp": 11500
+        },
+        {
+          "description_ar": "خدمة تركيب",
+          "description_en": "Installation service",
+          "quantity": 6,
+          "unit_price_egp": 1450,
+          "line_total_egp": 8700
+        }
+      ],
+      "subtotal_egp": 22410,
+      "tax_rate": 0.14,
+      "tax_egp": 3137.4,
+      "total_egp": 25547.4,
+      "invoice_iban": "EG00TEST171638395041",
+      "synthetic_only": true
+    },
+    {
+      "id": "STRESS2-004",
+      "file": "STRESS2-004.pdf",
+      "language": "ar",
+      "layout_variant": 1,
+      "quality_tier": "moderate",
+      "simulated_rotation_degrees": -0.96,
+      "vendor_name_ar": "شركة المدار للمقاولات",
+      "vendor_name_en": "Madar Contracting Co.",
+      "invoice_number": "SYN2-2026004",
+      "invoice_date": "2026-05-07",
+      "purchase_order": "PO-242003",
+      "tax_id": "SYNTH-REG-009603",
+      "currency": "EGP",
+      "line_items": [
+        {
+          "description_ar": "اشتراك برمجي",
+          "description_en": "Software subscription",
+          "quantity": 5,
+          "unit_price_egp": 2100,
+          "line_total_egp": 10500
+        },
+        {
+          "description_ar": "مستلزمات تغليف",
+          "description_en": "Wrapping supplies",
+          "quantity": 6,
+          "unit_price_egp": 185,
+          "line_total_egp": 1110
+        },
+        {
+          "description_ar": "أحبار وأدوات طباعة",
+          "description_en": "Ink and printing supplies",
+          "quantity": 7,
+          "unit_price_egp": 520,
+          "line_total_egp": 3640
+        }
+      ],
+      "subtotal_egp": 15250,
+      "tax_rate": 0.14,
+      "tax_egp": 2135.0,
+      "total_egp": 17385.0,
+      "invoice_iban": "EG00TEST111210987639",
+      "synthetic_only": true
+    },
+    {
+      "id": "STRESS2-005",
+      "file": "STRESS2-005.pdf",
+      "language": "en",
+      "layout_variant": 1,
+      "quality_tier": "hard",
+      "simulated_rotation_degrees": 1.23,
+      "vendor_name_ar": "المصرية للتوريدات",
+      "vendor_name_en": "Egyptian Supplies",
+      "invoice_number": "SYN2-2026005",
+      "invoice_date": "2026-05-09",
+      "purchase_order": "PO-242004",
+      "tax_id": "SYNTH-REG-012222",
+      "currency": "EGP",
+      "line_items": [
+        {
+          "description_ar": "خدمة توصيل",
+          "description_en": "Delivery service",
+          "quantity": 6,
+          "unit_price_egp": 260,
+          "line_total_egp": 1560
+        }
+      ],
+      "subtotal_egp": 1560,
+      "tax_rate": 0.14,
+      "tax_egp": 218.4,
+      "total_egp": 1778.4,
+      "invoice_iban": "EG00TEST141424691340",
+      "synthetic_only": true
+    },
+    {
+      "id": "STRESS2-006",
+      "file": "STRESS2-006.pdf",
+      "language": "mixed",
+      "layout_variant": 1,
+      "quality_tier": "clean",
+      "simulated_rotation_degrees": 0,
+      "vendor_name_ar": "مؤسسة بداية للطباعة",
+      "vendor_name_en": "Bedaya Printing Est.",
+      "invoice_number": "SYN2-2026006",
+      "invoice_date": "2026-05-11",
+      "purchase_order": "PO-242005",
+      "tax_id": "SYNTH-REG-014841",
+      "currency": "EGP",
+      "line_items": [
+        {
+          "description_ar": "قطع كهربائية",
+          "description_en": "Electrical components",
+          "quantity": 7,
+          "unit_price_egp": 730,
+          "line_total_egp": 5110
+        },
+        {
+          "description_ar": "خدمة معايرة",
+          "description_en": "Calibration service",
+          "quantity": 8,
+          "unit_price_egp": 980,
+          "line_total_egp": 7840
+        },
+        {
+          "description_ar": "معدات سلامة",
+          "description_en": "Safety equipment",
+          "quantity": 1,
+          "unit_price_egp": 390,
+          "line_total_egp": 390
+        },
+        {
+          "description_ar": "خدمة توصيل",
+          "description_en": "Delivery service",
+          "quantity": 2,
+          "unit_price_egp": 260,
+          "line_total_egp": 520
+        },
+        {
+          "description_ar": "تدريب فني",
+          "description_en": "Technical training",
+          "quantity": 3,
+          "unit_price_egp": 2300,
+          "line_total_egp": 6900
+        }
+      ],
+      "subtotal_egp": 20760,
+      "tax_rate": 0.14,
+      "tax_egp": 2906.4,
+      "total_egp": 23666.4,
+      "invoice_iban": "EG00TEST171638395041",
+      "synthetic_only": true
+    },
+    {
+      "id": "STRESS2-007",
+      "file": "STRESS2-007.pdf",
+      "language": "ar",
+      "layout_variant": 2,
+      "quality_tier": "hard",
+      "simulated_rotation_degrees": 0.42,
+      "vendor_name_ar": "شركة المدار للمقاولات",
+      "vendor_name_en": "Madar Contracting Co.",
+      "invoice_number": "SYN2-2026007",
+      "invoice_date": "2026-05-13",
+      "purchase_order": "PO-242006",
+      "tax_id": "SYNTH-REG-009603",
+      "currency": "EGP",
+      "line_items": [
+        {
+          "description_ar": "تدريب فني",
+          "description_en": "Technical training",
+          "quantity": 1,
+          "unit_price_egp": 2300,
+          "line_total_egp": 2300
+        },
+        {
+          "description_ar": "خدمة تركيب",
+          "description_en": "Installation service",
+          "quantity": 2,
+          "unit_price_egp": 1450,
+          "line_total_egp": 2900
+        },
+        {
+          "description_ar": "اشتراك برمجي",
+          "description_en": "Software subscription",
+          "quantity": 3,
+          "unit_price_egp": 2100,
+          "line_total_egp": 6300
+        },
+        {
+          "description_ar": "مستلزمات تغليف",
+          "description_en": "Wrapping supplies",
+          "quantity": 4,
+          "unit_price_egp": 185,
+          "line_total_egp": 740
+        }
+      ],
+      "subtotal_egp": 12240,
+      "tax_rate": 0.14,
+      "tax_egp": 1713.6,
+      "total_egp": 13953.6,
+      "invoice_iban": "EG00TEST111210987639",
+      "synthetic_only": true
+    },
+    {
+      "id": "STRESS2-008",
+      "file": "STRESS2-008.pdf",
+      "language": "en",
+      "layout_variant": 2,
+      "quality_tier": "clean",
+      "simulated_rotation_degrees": 0,
+      "vendor_name_ar": "المصرية للتوريدات",
+      "vendor_name_en": "Egyptian Supplies",
+      "invoice_number": "SYN2-2026008",
+      "invoice_date": "2026-05-15",
+      "purchase_order": "PO-242007",
+      "tax_id": "SYNTH-REG-012222",
+      "currency": "EGP",
+      "line_items": [
+        {
+          "description_ar": "خدمة معايرة",
+          "description_en": "Calibration service",
+          "quantity": 2,
+          "unit_price_egp": 980,
+          "line_total_egp": 1960
+        },
+        {
+          "description_ar": "معدات سلامة",
+          "description_en": "Safety equipment",
+          "quantity": 3,
+          "unit_price_egp": 390,
+          "line_total_egp": 1170
+        },
+        {
+          "description_ar": "خدمة توصيل",
+          "description_en": "Delivery service",
+          "quantity": 4,
+          "unit_price_egp": 260,
+          "line_total_egp": 1040
+        },
+        {
+          "description_ar": "تدريب فني",
+          "description_en": "Technical training",
+          "quantity": 5,
+          "unit_price_egp": 2300,
+          "line_total_egp": 11500
+        },
+        {
+          "description_ar": "خدمة تركيب",
+          "description_en": "Installation service",
+          "quantity": 6,
+          "unit_price_egp": 1450,
+          "line_total_egp": 8700
+        }
+      ],
+      "subtotal_egp": 24370,
+      "tax_rate": 0.14,
+      "tax_egp": 3411.8,
+      "total_egp": 27781.8,
+      "invoice_iban": "EG00TEST141424691340",
+      "synthetic_only": true
+    },
+    {
+      "id": "STRESS2-009",
+      "file": "STRESS2-009.pdf",
+      "language": "mixed",
+      "layout_variant": 2,
+      "quality_tier": "moderate",
+      "simulated_rotation_degrees": 0.96,
+      "vendor_name_ar": "مؤسسة بداية للطباعة",
+      "vendor_name_en": "Bedaya Printing Est.",
+      "invoice_number": "SYN2-2026009",
+      "invoice_date": "2026-05-17",
+      "purchase_order": "PO-242008",
+      "tax_id": "SYNTH-REG-014841",
+      "currency": "EGP",
+      "line_items": [
+        {
+          "description_ar": "أحبار وأدوات طباعة",
+          "description_en": "Ink and printing supplies",
+          "quantity": 3,
+          "unit_price_egp": 520,
+          "line_total_egp": 1560
+        }
+      ],
+      "subtotal_egp": 1560,
+      "tax_rate": 0.14,
+      "tax_egp": 218.4,
+      "total_egp": 1778.4,
+      "invoice_iban": "EG00TEST171638395041",
+      "synthetic_only": true
+    },
+    {
+      "id": "STRESS2-010",
+      "file": "STRESS2-010.pdf",
+      "language": "ar",
+      "layout_variant": 3,
+      "quality_tier": "clean",
+      "simulated_rotation_degrees": 0,
+      "vendor_name_ar": "شركة المدار للمقاولات",
+      "vendor_name_en": "Madar Contracting Co.",
+      "invoice_number": "SYN2-2026010",
+      "invoice_date": "2026-05-19",
+      "purchase_order": "PO-242009",
+      "tax_id": "SYNTH-REG-009603",
+      "currency": "EGP",
+      "line_items": [
+        {
+          "description_ar": "معدات سلامة",
+          "description_en": "Safety equipment",
+          "quantity": 5,
+          "unit_price_egp": 390,
+          "line_total_egp": 1950
+        }
+      ],
+      "subtotal_egp": 1950,
+      "tax_rate": 0.14,
+      "tax_egp": 273.0,
+      "total_egp": 2223.0,
+      "invoice_iban": "EG00TEST111210987639",
+      "synthetic_only": true
+    },
+    {
+      "id": "STRESS2-011",
+      "file": "STRESS2-011.pdf",
+      "language": "en",
+      "layout_variant": 3,
+      "quality_tier": "moderate",
+      "simulated_rotation_degrees": 0.15,
+      "vendor_name_ar": "المصرية للتوريدات",
+      "vendor_name_en": "Egyptian Supplies",
+      "invoice_number": "SYN2-2026011",
+      "invoice_date": "2026-05-21",
+      "purchase_order": "PO-242010",
+      "tax_id": "SYNTH-REG-012222",
+      "currency": "EGP",
+      "line_items": [
+        {
+          "description_ar": "مواد تنظيف",
+          "description_en": "Cleaning materials",
+          "quantity": 6,
+          "unit_price_egp": 110,
+          "line_total_egp": 660
+        },
+        {
+          "description_ar": "قطع كهربائية",
+          "description_en": "Electrical components",
+          "quantity": 7,
+          "unit_price_egp": 730,
+          "line_total_egp": 5110
+        }
+      ],
+      "subtotal_egp": 5770,
+      "tax_rate": 0.14,
+      "tax_egp": 807.8,
+      "total_egp": 6577.8,
+      "invoice_iban": "EG00TEST141424691340",
+      "synthetic_only": true
+    },
+    {
+      "id": "STRESS2-012",
+      "file": "STRESS2-012.pdf",
+      "language": "mixed",
+      "layout_variant": 3,
+      "quality_tier": "hard",
+      "simulated_rotation_degrees": -0.42,
+      "vendor_name_ar": "مؤسسة بداية للطباعة",
+      "vendor_name_en": "Bedaya Printing Est.",
+      "invoice_number": "SYN2-2026012",
+      "invoice_date": "2026-05-23",
+      "purchase_order": "PO-242011",
+      "tax_id": "SYNTH-REG-014841",
+      "currency": "EGP",
+      "line_items": [
+        {
+          "description_ar": "اشتراك برمجي",
+          "description_en": "Software subscription",
+          "quantity": 7,
+          "unit_price_egp": 2100,
+          "line_total_egp": 14700
+        },
+        {
+          "description_ar": "مستلزمات تغليف",
+          "description_en": "Wrapping supplies",
+          "quantity": 8,
+          "unit_price_egp": 185,
+          "line_total_egp": 1480
+        },
+        {
+          "description_ar": "أحبار وأدوات طباعة",
+          "description_en": "Ink and printing supplies",
+          "quantity": 1,
+          "unit_price_egp": 520,
+          "line_total_egp": 520
+        }
+      ],
+      "subtotal_egp": 16700,
+      "tax_rate": 0.14,
+      "tax_egp": 2338.0,
+      "total_egp": 19038.0,
+      "invoice_iban": "EG00TEST171638395041",
+      "synthetic_only": true
+    },
+    {
+      "id": "STRESS2-013",
+      "file": "STRESS2-013.pdf",
+      "language": "ar",
+      "layout_variant": 4,
+      "quality_tier": "moderate",
+      "simulated_rotation_degrees": 0.69,
+      "vendor_name_ar": "شركة المدار للمقاولات",
+      "vendor_name_en": "Madar Contracting Co.",
+      "invoice_number": "SYN2-2026013",
+      "invoice_date": "2026-05-25",
+      "purchase_order": "PO-242012",
+      "tax_id": "SYNTH-REG-009603",
+      "currency": "EGP",
+      "line_items": [
+        {
+          "description_ar": "قطع كهربائية",
+          "description_en": "Electrical components",
+          "quantity": 1,
+          "unit_price_egp": 730,
+          "line_total_egp": 730
+        },
+        {
+          "description_ar": "خدمة معايرة",
+          "description_en": "Calibration service",
+          "quantity": 2,
+          "unit_price_egp": 980,
+          "line_total_egp": 1960
+        }
+      ],
+      "subtotal_egp": 2690,
+      "tax_rate": 0.14,
+      "tax_egp": 376.6,
+      "total_egp": 3066.6,
+      "invoice_iban": "EG00TEST111210987639",
+      "synthetic_only": true
+    },
+    {
+      "id": "STRESS2-014",
+      "file": "STRESS2-014.pdf",
+      "language": "en",
+      "layout_variant": 4,
+      "quality_tier": "hard",
+      "simulated_rotation_degrees": -0.96,
+      "vendor_name_ar": "المصرية للتوريدات",
+      "vendor_name_en": "Egyptian Supplies",
+      "invoice_number": "SYN2-2026014",
+      "invoice_date": "2026-05-27",
+      "purchase_order": "PO-242013",
+      "tax_id": "SYNTH-REG-012222",
+      "currency": "EGP",
+      "line_items": [
+        {
+          "description_ar": "مستلزمات تغليف",
+          "description_en": "Wrapping supplies",
+          "quantity": 2,
+          "unit_price_egp": 185,
+          "line_total_egp": 370
+        }
+      ],
+      "subtotal_egp": 370,
+      "tax_rate": 0.14,
+      "tax_egp": 51.8,
+      "total_egp": 421.8,
+      "invoice_iban": "EG00TEST141424691340",
+      "synthetic_only": true
+    },
+    {
+      "id": "STRESS2-015",
+      "file": "STRESS2-015.pdf",
+      "language": "mixed",
+      "layout_variant": 4,
+      "quality_tier": "clean",
+      "simulated_rotation_degrees": 0,
+      "vendor_name_ar": "مؤسسة بداية للطباعة",
+      "vendor_name_en": "Bedaya Printing Est.",
+      "invoice_number": "SYN2-2026015",
+      "invoice_date": "2026-05-29",
+      "purchase_order": "PO-242014",
+      "tax_id": "SYNTH-REG-014841",
+      "currency": "EGP",
+      "line_items": [
+        {
+          "description_ar": "تدريب فني",
+          "description_en": "Technical training",
+          "quantity": 3,
+          "unit_price_egp": 2300,
+          "line_total_egp": 6900
+        },
+        {
+          "description_ar": "خدمة تركيب",
+          "description_en": "Installation service",
+          "quantity": 4,
+          "unit_price_egp": 1450,
+          "line_total_egp": 5800
+        },
+        {
+          "description_ar": "اشتراك برمجي",
+          "description_en": "Software subscription",
+          "quantity": 5,
+          "unit_price_egp": 2100,
+          "line_total_egp": 10500
+        },
+        {
+          "description_ar": "مستلزمات تغليف",
+          "description_en": "Wrapping supplies",
+          "quantity": 6,
+          "unit_price_egp": 185,
+          "line_total_egp": 1110
+        }
+      ],
+      "subtotal_egp": 24310,
+      "tax_rate": 0.14,
+      "tax_egp": 3403.4,
+      "total_egp": 27713.4,
+      "invoice_iban": "EG00TEST171638395041",
+      "synthetic_only": true
+    },
+    {
+      "id": "STRESS2-016",
+      "file": "STRESS2-016.pdf",
+      "language": "ar",
+      "layout_variant": 5,
+      "quality_tier": "hard",
+      "simulated_rotation_degrees": -0.15,
+      "vendor_name_ar": "شركة المدار للمقاولات",
+      "vendor_name_en": "Madar Contracting Co.",
+      "invoice_number": "SYN2-2026016",
+      "invoice_date": "2026-05-31",
+      "purchase_order": "PO-242015",
+      "tax_id": "SYNTH-REG-009603",
+      "currency": "EGP",
+      "line_items": [
+        {
+          "description_ar": "أحبار وأدوات طباعة",
+          "description_en": "Ink and printing supplies",
+          "quantity": 5,
+          "unit_price_egp": 520,
+          "line_total_egp": 2600
+        },
+        {
+          "description_ar": "مواد تنظيف",
+          "description_en": "Cleaning materials",
+          "quantity": 6,
+          "unit_price_egp": 110,
+          "line_total_egp": 660
+        },
+        {
+          "description_ar": "قطع كهربائية",
+          "description_en": "Electrical components",
+          "quantity": 7,
+          "unit_price_egp": 730,
+          "line_total_egp": 5110
+        }
+      ],
+      "subtotal_egp": 8370,
+      "tax_rate": 0.14,
+      "tax_egp": 1171.8,
+      "total_egp": 9541.8,
+      "invoice_iban": "EG00TEST111210987639",
+      "synthetic_only": true
+    },
+    {
+      "id": "STRESS2-017",
+      "file": "STRESS2-017.pdf",
+      "language": "en",
+      "layout_variant": 5,
+      "quality_tier": "clean",
+      "simulated_rotation_degrees": 0,
+      "vendor_name_ar": "المصرية للتوريدات",
+      "vendor_name_en": "Egyptian Supplies",
+      "invoice_number": "SYN2-2026017",
+      "invoice_date": "2026-06-02",
+      "purchase_order": "PO-242016",
+      "tax_id": "SYNTH-REG-012222",
+      "currency": "EGP",
+      "line_items": [
+        {
+          "description_ar": "خدمة تركيب",
+          "description_en": "Installation service",
+          "quantity": 6,
+          "unit_price_egp": 1450,
+          "line_total_egp": 8700
+        },
+        {
+          "description_ar": "اشتراك برمجي",
+          "description_en": "Software subscription",
+          "quantity": 7,
+          "unit_price_egp": 2100,
+          "line_total_egp": 14700
+        },
+        {
+          "description_ar": "مستلزمات تغليف",
+          "description_en": "Wrapping supplies",
+          "quantity": 8,
+          "unit_price_egp": 185,
+          "line_total_egp": 1480
+        },
+        {
+          "description_ar": "أحبار وأدوات طباعة",
+          "description_en": "Ink and printing supplies",
+          "quantity": 1,
+          "unit_price_egp": 520,
+          "line_total_egp": 520
+        }
+      ],
+      "subtotal_egp": 25400,
+      "tax_rate": 0.14,
+      "tax_egp": 3556.0,
+      "total_egp": 28956.0,
+      "invoice_iban": "EG00TEST141424691340",
+      "synthetic_only": true
+    },
+    {
+      "id": "STRESS2-018",
+      "file": "STRESS2-018.pdf",
+      "language": "mixed",
+      "layout_variant": 5,
+      "quality_tier": "moderate",
+      "simulated_rotation_degrees": -0.69,
+      "vendor_name_ar": "مؤسسة بداية للطباعة",
+      "vendor_name_en": "Bedaya Printing Est.",
+      "invoice_number": "SYN2-2026018",
+      "invoice_date": "2026-06-04",
+      "purchase_order": "PO-242017",
+      "tax_id": "SYNTH-REG-014841",
+      "currency": "EGP",
+      "line_items": [
+        {
+          "description_ar": "معدات سلامة",
+          "description_en": "Safety equipment",
+          "quantity": 7,
+          "unit_price_egp": 390,
+          "line_total_egp": 2730
+        }
+      ],
+      "subtotal_egp": 2730,
+      "tax_rate": 0.14,
+      "tax_egp": 382.2,
+      "total_egp": 3112.2,
+      "invoice_iban": "EG00TEST171638395041",
+      "synthetic_only": true
+    },
+    {
+      "id": "STRESS2-019",
+      "file": "STRESS2-019.pdf",
+      "language": "ar",
+      "layout_variant": 6,
+      "quality_tier": "clean",
+      "simulated_rotation_degrees": 0,
+      "vendor_name_ar": "شركة المدار للمقاولات",
+      "vendor_name_en": "Madar Contracting Co.",
+      "invoice_number": "SYN2-2026019",
+      "invoice_date": "2026-06-06",
+      "purchase_order": "PO-242018",
+      "tax_id": "SYNTH-REG-009603",
+      "currency": "EGP",
+      "line_items": [
+        {
+          "description_ar": "اشتراك برمجي",
+          "description_en": "Software subscription",
+          "quantity": 1,
+          "unit_price_egp": 2100,
+          "line_total_egp": 2100
+        }
+      ],
+      "subtotal_egp": 2100,
+      "tax_rate": 0.14,
+      "tax_egp": 294.0,
+      "total_egp": 2394.0,
+      "invoice_iban": "EG00TEST111210987639",
+      "synthetic_only": true
+    },
+    {
+      "id": "STRESS2-020",
+      "file": "STRESS2-020.pdf",
+      "language": "en",
+      "layout_variant": 6,
+      "quality_tier": "moderate",
+      "simulated_rotation_degrees": -1.23,
+      "vendor_name_ar": "المصرية للتوريدات",
+      "vendor_name_en": "Egyptian Supplies",
+      "invoice_number": "SYN2-2026020",
+      "invoice_date": "2026-06-08",
+      "purchase_order": "PO-242019",
+      "tax_id": "SYNTH-REG-012222",
+      "currency": "EGP",
+      "line_items": [
+        {
+          "description_ar": "خدمة توصيل",
+          "description_en": "Delivery service",
+          "quantity": 2,
+          "unit_price_egp": 260,
+          "line_total_egp": 520
+        },
+        {
+          "description_ar": "تدريب فني",
+          "description_en": "Technical training",
+          "quantity": 3,
+          "unit_price_egp": 2300,
+          "line_total_egp": 6900
+        },
+        {
+          "description_ar": "خدمة تركيب",
+          "description_en": "Installation service",
+          "quantity": 4,
+          "unit_price_egp": 1450,
+          "line_total_egp": 5800
+        },
+        {
+          "description_ar": "اشتراك برمجي",
+          "description_en": "Software subscription",
+          "quantity": 5,
+          "unit_price_egp": 2100,
+          "line_total_egp": 10500
+        },
+        {
+          "description_ar": "مستلزمات تغليف",
+          "description_en": "Wrapping supplies",
+          "quantity": 6,
+          "unit_price_egp": 185,
+          "line_total_egp": 1110
+        }
+      ],
+      "subtotal_egp": 24830,
+      "tax_rate": 0.14,
+      "tax_egp": 3476.2,
+      "total_egp": 28306.2,
+      "invoice_iban": "EG00TEST141424691340",
+      "synthetic_only": true
+    },
+    {
+      "id": "STRESS2-021",
+      "file": "STRESS2-021.pdf",
+      "language": "mixed",
+      "layout_variant": 6,
+      "quality_tier": "hard",
+      "simulated_rotation_degrees": 0.15,
+      "vendor_name_ar": "مؤسسة بداية للطباعة",
+      "vendor_name_en": "Bedaya Printing Est.",
+      "invoice_number": "SYN2-2026021",
+      "invoice_date": "2026-06-10",
+      "purchase_order": "PO-242020",
+      "tax_id": "SYNTH-REG-014841",
+      "currency": "EGP",
+      "line_items": [
+        {
+          "description_ar": "قطع كهربائية",
+          "description_en": "Electrical components",
+          "quantity": 3,
+          "unit_price_egp": 730,
+          "line_total_egp": 2190
+        },
+        {
+          "description_ar": "خدمة معايرة",
+          "description_en": "Calibration service",
+          "quantity": 4,
+          "unit_price_egp": 980,
+          "line_total_egp": 3920
+        }
+      ],
+      "subtotal_egp": 6110,
+      "tax_rate": 0.14,
+      "tax_egp": 855.4,
+      "total_egp": 6965.4,
+      "invoice_iban": "EG00TEST171638395041",
+      "synthetic_only": true
+    },
+    {
+      "id": "STRESS2-022",
+      "file": "STRESS2-022.pdf",
+      "language": "ar",
+      "layout_variant": 7,
+      "quality_tier": "moderate",
+      "simulated_rotation_degrees": -0.42,
+      "vendor_name_ar": "شركة المدار للمقاولات",
+      "vendor_name_en": "Madar Contracting Co.",
+      "invoice_number": "SYN2-2026022",
+      "invoice_date": "2026-06-12",
+      "purchase_order": "PO-242021",
+      "tax_id": "SYNTH-REG-009603",
+      "currency": "EGP",
+      "line_items": [
+        {
+          "description_ar": "تدريب فني",
+          "description_en": "Technical training",
+          "quantity": 5,
+          "unit_price_egp": 2300,
+          "line_total_egp": 11500
+        },
+        {
+          "description_ar": "خدمة تركيب",
+          "description_en": "Installation service",
+          "quantity": 6,
+          "unit_price_egp": 1450,
+          "line_total_egp": 8700
+        },
+        {
+          "description_ar": "اشتراك برمجي",
+          "description_en": "Software subscription",
+          "quantity": 7,
+          "unit_price_egp": 2100,
+          "line_total_egp": 14700
+        },
+        {
+          "description_ar": "مستلزمات تغليف",
+          "description_en": "Wrapping supplies",
+          "quantity": 8,
+          "unit_price_egp": 185,
+          "line_total_egp": 1480
+        },
+        {
+          "description_ar": "أحبار وأدوات طباعة",
+          "description_en": "Ink and printing supplies",
+          "quantity": 1,
+          "unit_price_egp": 520,
+          "line_total_egp": 520
+        }
+      ],
+      "subtotal_egp": 36900,
+      "tax_rate": 0.14,
+      "tax_egp": 5166.0,
+      "total_egp": 42066.0,
+      "invoice_iban": "EG00TEST111210987639",
+      "synthetic_only": true
+    },
+    {
+      "id": "STRESS2-023",
+      "file": "STRESS2-023.pdf",
+      "language": "en",
+      "layout_variant": 7,
+      "quality_tier": "hard",
+      "simulated_rotation_degrees": 0.69,
+      "vendor_name_ar": "المصرية للتوريدات",
+      "vendor_name_en": "Egyptian Supplies",
+      "invoice_number": "SYN2-2026023",
+      "invoice_date": "2026-06-14",
+      "purchase_order": "PO-242022",
+      "tax_id": "SYNTH-REG-012222",
+      "currency": "EGP",
+      "line_items": [
+        {
+          "description_ar": "خدمة معايرة",
+          "description_en": "Calibration service",
+          "quantity": 6,
+          "unit_price_egp": 980,
+          "line_total_egp": 5880
+        }
+      ],
+      "subtotal_egp": 5880,
+      "tax_rate": 0.14,
+      "tax_egp": 823.2,
+      "total_egp": 6703.2,
+      "invoice_iban": "EG00TEST141424691340",
+      "synthetic_only": true
+    },
+    {
+      "id": "STRESS2-024",
+      "file": "STRESS2-024.pdf",
+      "language": "mixed",
+      "layout_variant": 7,
+      "quality_tier": "clean",
+      "simulated_rotation_degrees": 0,
+      "vendor_name_ar": "مؤسسة بداية للطباعة",
+      "vendor_name_en": "Bedaya Printing Est.",
+      "invoice_number": "SYN2-2026024",
+      "invoice_date": "2026-06-16",
+      "purchase_order": "PO-242023",
+      "tax_id": "SYNTH-REG-014841",
+      "currency": "EGP",
+      "line_items": [
+        {
+          "description_ar": "أحبار وأدوات طباعة",
+          "description_en": "Ink and printing supplies",
+          "quantity": 7,
+          "unit_price_egp": 520,
+          "line_total_egp": 3640
+        },
+        {
+          "description_ar": "مواد تنظيف",
+          "description_en": "Cleaning materials",
+          "quantity": 8,
+          "unit_price_egp": 110,
+          "line_total_egp": 880
+        },
+        {
+          "description_ar": "قطع كهربائية",
+          "description_en": "Electrical components",
+          "quantity": 1,
+          "unit_price_egp": 730,
+          "line_total_egp": 730
+        }
+      ],
+      "subtotal_egp": 5250,
+      "tax_rate": 0.14,
+      "tax_egp": 735.0,
+      "total_egp": 5985.0,
+      "invoice_iban": "EG00TEST171638395041",
+      "synthetic_only": true
+    },
+    {
+      "id": "STRESS2-025",
+      "file": "STRESS2-025.pdf",
+      "language": "ar",
+      "layout_variant": 8,
+      "quality_tier": "hard",
+      "simulated_rotation_degrees": 1.23,
+      "vendor_name_ar": "شركة المدار للمقاولات",
+      "vendor_name_en": "Madar Contracting Co.",
+      "invoice_number": "SYN2-2026025",
+      "invoice_date": "2026-06-18",
+      "purchase_order": "PO-242024",
+      "tax_id": "SYNTH-REG-009603",
+      "currency": "EGP",
+      "line_items": [
+        {
+          "description_ar": "معدات سلامة",
+          "description_en": "Safety equipment",
+          "quantity": 1,
+          "unit_price_egp": 390,
+          "line_total_egp": 390
+        },
+        {
+          "description_ar": "خدمة توصيل",
+          "description_en": "Delivery service",
+          "quantity": 2,
+          "unit_price_egp": 260,
+          "line_total_egp": 520
+        }
+      ],
+      "subtotal_egp": 910,
+      "tax_rate": 0.14,
+      "tax_egp": 127.4,
+      "total_egp": 1037.4,
+      "invoice_iban": "EG00TEST111210987639",
+      "synthetic_only": true
+    },
+    {
+      "id": "STRESS2-026",
+      "file": "STRESS2-026.pdf",
+      "language": "en",
+      "layout_variant": 8,
+      "quality_tier": "clean",
+      "simulated_rotation_degrees": 0,
+      "vendor_name_ar": "المصرية للتوريدات",
+      "vendor_name_en": "Egyptian Supplies",
+      "invoice_number": "SYN2-2026026",
+      "invoice_date": "2026-06-20",
+      "purchase_order": "PO-242025",
+      "tax_id": "SYNTH-REG-012222",
+      "currency": "EGP",
+      "line_items": [
+        {
+          "description_ar": "مواد تنظيف",
+          "description_en": "Cleaning materials",
+          "quantity": 2,
+          "unit_price_egp": 110,
+          "line_total_egp": 220
+        },
+        {
+          "description_ar": "قطع كهربائية",
+          "description_en": "Electrical components",
+          "quantity": 3,
+          "unit_price_egp": 730,
+          "line_total_egp": 2190
+        },
+        {
+          "description_ar": "خدمة معايرة",
+          "description_en": "Calibration service",
+          "quantity": 4,
+          "unit_price_egp": 980,
+          "line_total_egp": 3920
+        }
+      ],
+      "subtotal_egp": 6330,
+      "tax_rate": 0.14,
+      "tax_egp": 886.2,
+      "total_egp": 7216.2,
+      "invoice_iban": "EG00TEST141424691340",
+      "synthetic_only": true
+    },
+    {
+      "id": "STRESS2-027",
+      "file": "STRESS2-027.pdf",
+      "language": "mixed",
+      "layout_variant": 8,
+      "quality_tier": "moderate",
+      "simulated_rotation_degrees": 0.42,
+      "vendor_name_ar": "مؤسسة بداية للطباعة",
+      "vendor_name_en": "Bedaya Printing Est.",
+      "invoice_number": "SYN2-2026027",
+      "invoice_date": "2026-06-22",
+      "purchase_order": "PO-242026",
+      "tax_id": "SYNTH-REG-014841",
+      "currency": "EGP",
+      "line_items": [
+        {
+          "description_ar": "اشتراك برمجي",
+          "description_en": "Software subscription",
+          "quantity": 3,
+          "unit_price_egp": 2100,
+          "line_total_egp": 6300
+        }
+      ],
+      "subtotal_egp": 6300,
+      "tax_rate": 0.14,
+      "tax_egp": 882.0,
+      "total_egp": 7182.0,
+      "invoice_iban": "EG00TEST171638395041",
+      "synthetic_only": true
+    },
+    {
+      "id": "STRESS2-028",
+      "file": "STRESS2-028.pdf",
+      "language": "ar",
+      "layout_variant": 9,
+      "quality_tier": "clean",
+      "simulated_rotation_degrees": 0,
+      "vendor_name_ar": "شركة المدار للمقاولات",
+      "vendor_name_en": "Madar Contracting Co.",
+      "invoice_number": "SYN2-2026028",
+      "invoice_date": "2026-06-24",
+      "purchase_order": "PO-242027",
+      "tax_id": "SYNTH-REG-009603",
+      "currency": "EGP",
+      "line_items": [
+        {
+          "description_ar": "قطع كهربائية",
+          "description_en": "Electrical components",
+          "quantity": 5,
+          "unit_price_egp": 730,
+          "line_total_egp": 3650
+        }
+      ],
+      "subtotal_egp": 3650,
+      "tax_rate": 0.14,
+      "tax_egp": 511.0,
+      "total_egp": 4161.0,
+      "invoice_iban": "EG00TEST111210987639",
+      "synthetic_only": true
+    },
+    {
+      "id": "STRESS2-029",
+      "file": "STRESS2-029.pdf",
+      "language": "en",
+      "layout_variant": 9,
+      "quality_tier": "moderate",
+      "simulated_rotation_degrees": 0.96,
+      "vendor_name_ar": "المصرية للتوريدات",
+      "vendor_name_en": "Egyptian Supplies",
+      "invoice_number": "SYN2-2026029",
+      "invoice_date": "2026-06-26",
+      "purchase_order": "PO-242028",
+      "tax_id": "SYNTH-REG-012222",
+      "currency": "EGP",
+      "line_items": [
+        {
+          "description_ar": "مستلزمات تغليف",
+          "description_en": "Wrapping supplies",
+          "quantity": 6,
+          "unit_price_egp": 185,
+          "line_total_egp": 1110
+        },
+        {
+          "description_ar": "أحبار وأدوات طباعة",
+          "description_en": "Ink and printing supplies",
+          "quantity": 7,
+          "unit_price_egp": 520,
+          "line_total_egp": 3640
+        },
+        {
+          "description_ar": "مواد تنظيف",
+          "description_en": "Cleaning materials",
+          "quantity": 8,
+          "unit_price_egp": 110,
+          "line_total_egp": 880
+        },
+        {
+          "description_ar": "قطع كهربائية",
+          "description_en": "Electrical components",
+          "quantity": 1,
+          "unit_price_egp": 730,
+          "line_total_egp": 730
+        }
+      ],
+      "subtotal_egp": 6360,
+      "tax_rate": 0.14,
+      "tax_egp": 890.4,
+      "total_egp": 7250.4,
+      "invoice_iban": "EG00TEST141424691340",
+      "synthetic_only": true
+    },
+    {
+      "id": "STRESS2-030",
+      "file": "STRESS2-030.pdf",
+      "language": "mixed",
+      "layout_variant": 9,
+      "quality_tier": "hard",
+      "simulated_rotation_degrees": -1.23,
+      "vendor_name_ar": "مؤسسة بداية للطباعة",
+      "vendor_name_en": "Bedaya Printing Est.",
+      "invoice_number": "SYN2-2026030",
+      "invoice_date": "2026-06-28",
+      "purchase_order": "PO-242029",
+      "tax_id": "SYNTH-REG-014841",
+      "currency": "EGP",
+      "line_items": [
+        {
+          "description_ar": "تدريب فني",
+          "description_en": "Technical training",
+          "quantity": 7,
+          "unit_price_egp": 2300,
+          "line_total_egp": 16100
+        },
+        {
+          "description_ar": "خدمة تركيب",
+          "description_en": "Installation service",
+          "quantity": 8,
+          "unit_price_egp": 1450,
+          "line_total_egp": 11600
+        },
+        {
+          "description_ar": "اشتراك برمجي",
+          "description_en": "Software subscription",
+          "quantity": 1,
+          "unit_price_egp": 2100,
+          "line_total_egp": 2100
+        },
+        {
+          "description_ar": "مستلزمات تغليف",
+          "description_en": "Wrapping supplies",
+          "quantity": 2,
+          "unit_price_egp": 185,
+          "line_total_egp": 370
+        },
+        {
+          "description_ar": "أحبار وأدوات طباعة",
+          "description_en": "Ink and printing supplies",
+          "quantity": 3,
+          "unit_price_egp": 520,
+          "line_total_egp": 1560
+        }
+      ],
+      "subtotal_egp": 31730,
+      "tax_rate": 0.14,
+      "tax_egp": 4442.2,
+      "total_egp": 36172.2,
+      "invoice_iban": "EG00TEST171638395041",
+      "synthetic_only": true
+    }
+  ]
+}
