@@ -1,0 +1,125 @@
+{
+  "id": "sfErrorAlerts0001",
+  "name": "0 Error alerts",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "e1",
+      "name": "Any workflow failed",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// One alert format for failures in every SecureFin workflow. Error text is cut short and escaped.\nconst j = $input.first().json;\nconst html = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\nconst name = j.workflow?.name ?? 'unknown workflow';\nconst where = j.execution?.lastNodeExecuted ?? j.trigger?.error?.node?.name ?? 'trigger';\nconst message = String(j.execution?.error?.message ?? j.trigger?.error?.message ?? 'no error message').slice(0, 600);\nconst plain = [`SecureFin automation alert / تنبيه`, `Workflow: ${name}`, `Step: ${where}`, '', message,\n  ...(j.execution?.url ? ['', j.execution.url] : [])].join('\\n');\nreturn [{ json: { subject: `SecureFin alert: ${name}`, plain, text: html(plain) } }];"
+      },
+      "id": "e2",
+      "name": "Build alert",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $env.TELEGRAM_CHAT_ID }}",
+        "text": "={{ $json.text }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML",
+          "disable_web_page_preview": true
+        }
+      },
+      "id": "e3",
+      "name": "Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        440,
+        0
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "sfTelegramAlerts01",
+          "name": "SecureFin alerts bot (Telegram)"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 2000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{ $env.ALERT_EMAIL_FROM }}",
+        "toEmail": "={{ $env.ALERT_EMAIL_TO }}",
+        "subject": "={{ $('Build alert').item.json.subject }}",
+        "emailFormat": "text",
+        "text": "={{ $('Build alert').item.json.plain }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "e4",
+      "name": "Email fallback",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        660,
+        100
+      ],
+      "credentials": {
+        "smtp": {
+          "id": "sfAlertsSmtp00001",
+          "name": "SecureFin alerts (SMTP)"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Any workflow failed": {
+      "main": [
+        [
+          {
+            "node": "Build alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build alert": {
+      "main": [
+        [
+          {
+            "node": "Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Email fallback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "active": false
+}

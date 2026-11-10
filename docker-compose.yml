@@ -17,18 +17,51 @@ services:
     ports: ["5432:5432"]
     volumes: [pgdata:/var/lib/postgresql/data]
 
-  # Optional automation. Start with: docker compose --profile n8n up
+  # Optional automation (n8n/README.md). Start with: docker compose --profile n8n up -d n8n
+  # n8n only notifies and reports. It gets no database URL and no approval key: it calls service APIs with its own
+  # tokens, and every variable it may read is listed here on purpose (no env_file).
   n8n:
     image: n8nio/n8n:2.46.7  # pinned; bump on purpose after reading the release notes
     profiles: [n8n]
-    ports: ["5678:5678"]
+    entrypoint:
+      - /bin/sh
+      - -c
+      - '[ -n "$$N8N_ENCRYPTION_KEY" ] || { echo "Set N8N_ENCRYPTION_KEY in .env (openssl rand -hex 32)" >&2; exit 1; }; exec tini -- /docker-entrypoint.sh'
+    ports: ["127.0.0.1:5678:5678"]  # editor on this machine only; services reach it as http://n8n:5678
     environment:
-      # read by n8n/workflows/invoice-email-intake.json
-      N8N_BLOCK_ENV_ACCESS_IN_NODE: "false"
+      # Saved credentials are encrypted with this key. Without a fixed key a rebuilt container cannot read them.
+      # The entrypoint below refuses to start without it (a ${VAR:?} check here would break compose for everyone
+      # who does not run n8n).
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY:-}
+      GENERIC_TIMEZONE: Africa/Cairo  # the nightly run is at 02:00 Cairo time
+      TZ: Africa/Cairo
+      N8N_BLOCK_ENV_ACCESS_IN_NODE: "false"  # the workflows read the variables below
+      # No shell, no local files and no Postgres node: n8n must go through the service APIs.
+      NODES_EXCLUDE: '["n8n-nodes-base.executeCommand","n8n-nodes-base.ssh","n8n-nodes-base.localFileTrigger","n8n-nodes-base.readWriteFile","n8n-nodes-base.postgres"]'
+      EXECUTIONS_DATA_PRUNE: "true"
+      EXECUTIONS_DATA_MAX_AGE: "168"  # hours; execution logs can hold invoice files
+      # 1 invoice email intake
       N8N_INVOICE_UPLOAD_URL: ${N8N_INVOICE_UPLOAD_URL:-http://api:8000/v1/invoices/upload}
+      N8N_INTAKE_TOKEN: ${N8N_INTAKE_TOKEN:-}
       N8N_COMPANY_ID: ${N8N_COMPANY_ID:-1}
-      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
-    volumes: [./n8n/workflows:/workflows]
+      # 2 decision notifications
+      N8N_WEBHOOK_HMAC_SECRET: ${N8N_WEBHOOK_HMAC_SECRET:-}
+      APP_BASE_URL: ${APP_BASE_URL:-http://localhost:3000}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+      ALERT_EMAIL_FROM: ${ALERT_EMAIL_FROM:-}
+      ALERT_EMAIL_TO: ${ALERT_EMAIL_TO:-}
+      # 3 nightly integrity run
+      N8N_AUDIT_VERIFY_URL: ${N8N_AUDIT_VERIFY_URL:-http://gateway:8000/v1/audit/verify}
+      N8N_GATEWAY_TOKEN: ${AUDIT_VERIFY_TOKEN:-}
+      N8N_AUDIT_COMPANY_IDS: ${N8N_AUDIT_COMPANY_IDS:-1}
+      N8N_ATTACK_RUN_URL: ${N8N_ATTACK_RUN_URL:-}
+      N8N_EVAL_TOKEN: ${N8N_EVAL_TOKEN:-}
+      N8N_ATTACK_MIN_CASES: ${N8N_ATTACK_MIN_CASES:-22}
+      N8N_HEARTBEAT_URL: ${N8N_HEARTBEAT_URL:-}
+    volumes:
+      - n8n_data:/home/node/.n8n  # credentials, published workflows, seen event ids, last-OK time
+      - ./n8n/workflows:/workflows:ro
 
 volumes:
   pgdata:
+  n8n_data:
