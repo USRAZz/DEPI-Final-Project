@@ -139,3 +139,14 @@ python eval/ocr_benchmark.py --engine paddleocr --set all --paddle-item-crop-pas
 python eval/ocr_benchmark.py --engine tesseract --set all --preprocess enhance --output eval/results/ocr_tesseract_all_enhanced.csv
 python eval/ocr_benchmark.py --engine tesseract --set all --tesseract-psm 11 --output eval/results/ocr_tesseract_all_psm11.csv
 ```
+
+### Service OCR check (2026-11-10)
+
+`eval/service_ocr_check.py` scores what `services/extractor/app/ocr.py` actually runs, with the same normalized scoring, on all 130 invoices.
+
+| Service configuration | Field hits | Vendor | Descriptions | Quantity | Mean time/page |
+|---|---:|---:|---:|---:|---:|
+| Before: 200 dpi render, full-page ar + en | 1,962/2,032 (96.6%) | 124/130 | 171/228 | 225/228 | 11.24 s |
+| After: embedded scan at native size + Arabic header pass | **1,964/2,032 (96.7%)** | **126/130** | 168/228 | **228/228** | **8.79 s** |
+
+Per invoice: vendor fixed on INV-003/013/042, STRESS-016/025, STRESS3-012; vendor lost on INV-008, STRESS-022, STRESS3-007, STRESS3-013; three descriptions and one tax value lost. Net +2 fields and 22% faster; the vendor regressions need a look at the header merge.

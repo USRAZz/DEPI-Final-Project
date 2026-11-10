@@ -102,22 +102,38 @@ def test_iban_and_tax_id_are_read_by_code_and_never_sent_to_the_llm(tmp_path):
 
 
 def test_paddle_output_is_merged_from_both_models(monkeypatch):
-    class Res:
-        def __init__(self, payload):
-            self.json = {"res": payload}
-
-    class Model:
-        def __init__(self, payload):
-            self.payload = payload
-
-        def predict(self, arr):
-            return [Res(self.payload)]
-
     models = {
-        "ar": Model({"rec_texts": ["مصنع", "النيل"], "rec_scores": [0.9, 0.8],
-                     "rec_boxes": [[0, 0, 10, 10], [20, 0, 30, 10]]}),
-        "en": Model({"rec_texts": ["INV-1"], "rec_scores": [1.0], "rec_boxes": [[0, 20, 10, 30]]}),
+        "ar": FakePaddle({"rec_texts": ["مصنع", "النيل"], "rec_scores": [0.9, 0.8],
+                          "rec_boxes": [[0, 0, 10, 10], [20, 0, 30, 10]]}),
+        "en": FakePaddle({"rec_texts": ["INV-1"], "rec_scores": [1.0], "rec_boxes": [[0, 20, 10, 30]]}),
     }
     monkeypatch.setattr(ocr, "_paddle_model", lambda lang: models[lang])
     text, conf = ocr._paddle(Image.new("RGB", (40, 40), "white"))
-    assert text == "النيل مصنع\nINV-1" and conf == 0.9
+    assert text == "النيل مصنع\nINV-1" and conf == 0.9  # header pass read the same words: no duplicates
+
+
+def test_header_pass_fixes_latin_letter_inside_arabic(monkeypatch):
+    full = {"rec_texts": ["مصiع"], "rec_scores": [0.7], "rec_boxes": [[0, 0, 10, 10]]}
+    header = {"rec_texts": ["مصنع"], "rec_scores": [0.95], "rec_boxes": [[0, 0, 10, 10]]}
+    models = {"ar": FakePaddle(full, header=header), "en": FakePaddle({"rec_texts": [], "rec_boxes": []})}
+    monkeypatch.setattr(ocr, "_paddle_model", lambda lang: models[lang])
+    text, _ = ocr._paddle(Image.new("RGB", (40, 40), "white"))
+    assert text == "مصنع"
+
+
+class FakePaddle:
+    """Returns page-pixel boxes; for the 2x header crop it returns them in crop pixels, like PaddleOCR."""
+
+    def __init__(self, payload, header=None):
+        self.payload, self.header = payload, header or payload
+
+    def predict(self, arr):
+        if arr.shape[0] == 40:  # the full test page
+            return [_Res(self.payload)]
+        boxes = [[v * ocr.HEADER_SCALE for v in b] for b in self.header.get("rec_boxes", [])]
+        return [_Res({**self.header, "rec_boxes": boxes})]
+
+
+class _Res:
+    def __init__(self, payload):
+        self.json = {"res": payload}
