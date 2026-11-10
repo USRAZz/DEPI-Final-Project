@@ -1,7 +1,9 @@
+import hmac
+import os
 from datetime import UTC, datetime
 
-from fastapi import FastAPI, HTTPException
-from pydantic import ValidationError
+from fastapi import FastAPI, Header, HTTPException
+from pydantic import BaseModel, Field, ValidationError
 from securefin_contracts import (
     ApprovalRequest,
     ApprovalResult,
@@ -16,7 +18,7 @@ from securefin_contracts import (
 from securefin_contracts.actions import CreatePaymentParams
 
 from .approvals import ApprovalDenied, ApprovalKeyError, execute_check, load_hmac_key, submit_approval
-from .audit_log import InMemoryAuditLog, PostgresAuditLog
+from .audit_log import InMemoryAuditLog, PostgresAuditLog, first_broken
 from .db import build_engine
 from .payments_client import PaymentNotFoundError, PaymentsUnavailableError, build_payments_client
 from .policy import BASE_CURRENCY, get_policy
@@ -156,3 +158,25 @@ def execute_check_endpoint(req: ExecuteCheckRequest) -> ExecuteCheckResult:
     _audit("execute_check", req.company_id, req.requested_by, "ALLOW" if result.allowed else "BLOCK",
            "; ".join(result.reasons) or "allowed", params)
     return result
+
+
+class AuditVerifyRequest(BaseModel):
+    company_id: int = Field(gt=0)
+
+
+@app.post("/v1/audit/verify")
+def audit_verify(req: AuditVerifyRequest, x_service_token: str | None = Header(default=None)) -> dict:
+    """Re-check one company's audit hash chain (called by the nightly n8n integrity run; read-only).
+
+    AUDIT_VERIFY_TOKEN is accepted here and nowhere else. Without it configured the endpoint is closed.
+    """
+    expected = os.environ.get("AUDIT_VERIFY_TOKEN", "")
+    if not expected:
+        raise HTTPException(status_code=503, detail=["audit verification is not configured"])
+    if not x_service_token or not hmac.compare_digest(x_service_token.encode(), expected.encode()):
+        raise HTTPException(status_code=401, detail=["invalid service token"])
+    entries = AUDIT_LOG.entries(req.company_id)  # one read, so the verdict and the count describe the same rows
+    broken = first_broken(entries)
+    return {"ok": broken is None, "company_id": req.company_id, "entries": len(entries),
+            "first_broken_index": broken, "first_broken_id": None if broken is None else entries[broken].id,
+            "head_hash": entries[-1].entry_hash if entries else None}

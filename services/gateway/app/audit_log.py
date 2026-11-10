@@ -24,7 +24,8 @@ def _hashed(event: AuditEvent, timestamp: datetime, prev_hash: str) -> AuditEntr
     return draft.model_copy(update={"entry_hash": compute_hash(data, prev_hash)})
 
 
-def _verify(entries: list[AuditEntry]) -> int | None:
+def first_broken(entries: list[AuditEntry]) -> int | None:
+    """Index of the first entry that breaks the chain; None when the chain is intact."""
     return verify_chain([e.model_dump(mode="json", exclude={"id"}) for e in entries])
 
 
@@ -45,7 +46,7 @@ class InMemoryAuditLog:
         return [e for e in self._entries if e.company_id == company_id]
 
     def verify(self, company_id: int | None) -> int | None:
-        return _verify(self.entries(company_id))
+        return first_broken(self.entries(company_id))
 
 
 class PostgresAuditLog:
@@ -74,4 +75,4 @@ class PostgresAuditLog:
             return [AuditEntry(**r) for r in rows]
 
     def verify(self, company_id: int) -> int | None:
-        return _verify(self.entries(company_id))
+        return first_broken(self.entries(company_id))

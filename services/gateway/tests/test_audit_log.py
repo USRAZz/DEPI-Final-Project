@@ -64,3 +64,26 @@ def test_each_company_has_its_own_chain():
     a = log.append(AuditEvent(user_id=1, company_id=1, action="x", source_service="gateway"))
     b = log.append(AuditEvent(user_id=2, company_id=2, action="x", source_service="gateway"))
     assert a.prev_hash == b.prev_hash == "0" * 64
+
+
+def test_verify_endpoint_reports_the_tampered_row(monkeypatch):
+    monkeypatch.setenv("AUDIT_VERIFY_TOKEN", "t" * 40)
+    headers = {"X-Service-Token": "t" * 40}
+    for approver in (10, 11, 12):
+        _approve(approver)
+    ok = client.post("/v1/audit/verify", json={"company_id": 1}, headers=headers).json()
+    assert (ok["ok"], ok["entries"], ok["first_broken_id"]) == (True, 3, None)
+    assert ok["head_hash"] == main.AUDIT_LOG.entries(1)[-1].entry_hash
+
+    log = main.AUDIT_LOG._entries                                            # what a DBA with UPDATE could do
+    log[1] = log[1].model_copy(update={"decision": "ALLOW"})
+    bad = client.post("/v1/audit/verify", json={"company_id": 1}, headers=headers).json()
+    assert (bad["ok"], bad["first_broken_index"], bad["first_broken_id"]) == (False, 1, log[1].id)
+
+
+def test_verify_endpoint_is_closed_without_the_right_token(monkeypatch):
+    monkeypatch.delenv("AUDIT_VERIFY_TOKEN", raising=False)
+    assert client.post("/v1/audit/verify", json={"company_id": 1}, headers={"X-Service-Token": ""}).status_code == 503
+    monkeypatch.setenv("AUDIT_VERIFY_TOKEN", "t" * 40)
+    assert client.post("/v1/audit/verify", json={"company_id": 1}).status_code == 401
+    assert client.post("/v1/audit/verify", json={"company_id": 1}, headers={"X-Service-Token": "x"}).status_code == 401

@@ -78,5 +78,8 @@ The HTTP endpoints and the `approvals` table are added in the next PR.
   set (row-level security). Without `DATABASE_URL` both live in memory (local runs, unit tests).
 - `audit_log` is one hash chain per company (`app/audit_log.py`); `verify(company_id)` returns the first broken
   entry or None. Appends take a per-company advisory lock so two requests cannot fork the chain.
+- `POST /v1/audit/verify` `{"company_id": 1}` with `X-Service-Token: $AUDIT_VERIFY_TOKEN` (a token for this
+  endpoint only; unset = 503) returns `{ok, entries, first_broken_index, first_broken_id, head_hash}`. The nightly
+  n8n integrity run calls it (`n8n/README.md`).
 - Known shortcut: an approval row and its audit entry are written in two transactions.
 - Tests: `tests/test_audit_log.py`; `tests/test_db_store_audit.py` needs `TEST_DATABASE_URL` (CI job `migrations-postgres`).
