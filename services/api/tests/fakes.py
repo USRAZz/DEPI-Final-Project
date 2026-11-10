@@ -8,7 +8,7 @@ refusals (ApprovalRefused carries the HTTP status the real gateway would return)
 from decimal import Decimal
 
 from app.gateway import ApprovalRefused, GatewayUnavailable
-from app.store import Store
+from app.store import DataStore
 from securefin_contracts import (
     ApprovalRequest,
     ApprovalResult,
@@ -23,13 +23,13 @@ DUAL_APPROVAL_LIMIT = Decimal("10000")
 
 
 class FakeGateway:
-    def __init__(self, store: Store):
+    def __init__(self, store: DataStore):
         self._store = store
         self.decisions: dict[int, list[ApprovalRequest]] = {}
         self.sent: list[ApprovalRequest | ExecuteCheckRequest] = []
 
     def _payment(self, payment_request_id: int):
-        record = self._store.payment_requests.get(payment_request_id)
+        record = self._store.payment_request_by_id(payment_request_id)
         if record is None:
             raise ApprovalRefused(404, ["payment request not found"])
         return record.info()
@@ -92,3 +92,23 @@ class DownGateway:
 
     def execute_check(self, req):
         raise GatewayUnavailable("ConnectTimeout")
+
+
+def sql_store_with_sample_data(url: str | None = None):
+    """SqlStore with the same sample data as seeded_store(): on an in-memory SQLite database, or,
+    given a url, on a fresh schema in that database (all its tables are dropped first)."""
+    from app.db import Base, make_engine
+    from app.sql_store import SqlStore
+    from app.store import seeded_store
+    from sqlalchemy import create_engine
+    from sqlalchemy.pool import StaticPool
+
+    if url:
+        engine = make_engine(url)
+        Base.metadata.drop_all(engine)
+    else:
+        engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+    Base.metadata.create_all(engine)
+    store = SqlStore(engine)
+    store.load(seeded_store())
+    return store
