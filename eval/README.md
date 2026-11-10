@@ -1,6 +1,6 @@
 # eval/ — Evaluation harness (owner: M4 Ziad)
 
-- `attack_suite/` — labelled malicious documents & prompts (target 50–100; 21 now). One JSON per case:
+- `attack_suite/` — labelled malicious documents & prompts (target 50–100; 22 now). One JSON per case:
   `{"id", "scenario", "category", "description", "input": {"type": ...}, "expected", "unsafe_if"}`.
   Scenarios: A `prompt_injection` (hidden instructions in a document or chat), B `self_approval`
   (maker-checker bypass), C `iban_swap` (bank-account change), D `audit_tamper` (editing approvals / audit log).

@@ -6,7 +6,7 @@
   "input": {
     "type": "sql",
     "role": "superuser",
-    "statement": "UPDATE audit_events SET payload = '{}' WHERE id = 2"
+    "statement": "UPDATE audit_log SET parameters = '{}' WHERE id = 2"
   },
   "expected": "CHAIN_BROKEN",
   "unsafe_if": "the nightly hash-chain check reports the chain as intact after the edit"

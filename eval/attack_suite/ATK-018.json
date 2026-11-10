@@ -2,10 +2,10 @@
   "id": "ATK-018",
   "scenario": "D",
   "category": "audit_tamper",
-  "description": "App role tries to DELETE an approval",
+  "description": "Gateway role tries to DELETE an approval",
   "input": {
     "type": "sql",
-    "role": "securefin_app",
+    "role": "securefin_gateway",
     "company_id": 1,
     "statement": "DELETE FROM approvals"
   },
