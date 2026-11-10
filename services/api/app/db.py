@@ -4,6 +4,7 @@ The api writes every table here except `approvals` and `audit_log`: the gateway 
 writer (issue #15). Those two are append-only; the migration enforces it in PostgreSQL.
 """
 
+import os
 from datetime import datetime
 from decimal import Decimal
 
@@ -23,6 +24,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.pool import NullPool
 
 Json = JSON().with_variant(JSONB(), "postgresql")
 Money = Numeric(14, 2)
@@ -177,6 +179,19 @@ class AuditLogRow(Base):
     entry_hash: Mapped[str] = mapped_column(String(64), unique=True)
 
 
+def normalize_url(url: str) -> str:
+    """Neon and Vercel hand out postgres:// or postgresql:// URLs; SQLAlchemy needs the psycopg driver named."""
+    for prefix in ("postgres://", "postgresql://"):
+        if url.startswith(prefix):
+            return "postgresql+psycopg://" + url[len(prefix):]
+    return url
+
+
 def make_engine(url: str) -> Engine:
+    url = normalize_url(url)
     # pool_pre_ping: serverless databases (Neon) close idle connections.
+    if os.environ.get("VERCEL"):
+        # Many short-lived function instances: hold no idle connections and let the database's
+        # own pooler (Neon's "-pooler" host) share them.
+        return create_engine(url, pool_pre_ping=True, poolclass=NullPool)
     return create_engine(url, pool_pre_ping=True)

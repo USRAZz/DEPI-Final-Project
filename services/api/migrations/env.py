@@ -1,7 +1,7 @@
 import os
 
 from alembic import context
-from app.db import Base
+from app.db import Base, normalize_url
 from sqlalchemy import engine_from_config, pool
 
 config = context.config
@@ -12,7 +12,7 @@ def _url() -> str:
     url = os.environ.get("DATABASE_URL")
     if not url:
         raise SystemExit("DATABASE_URL is not set")
-    return url
+    return normalize_url(url)
 
 
 def run_migrations_offline() -> None:

@@ -251,3 +251,17 @@ class TestPaymentInfoForGateway:
     @pytest.mark.parametrize("headers", [{}, {"X-Service-Token": "wrong"}, as_user(KARIM)])
     def test_needs_the_service_token(self, client, headers):
         assert client.get(f"/payments/{PR_187}", headers=headers).status_code == 401
+
+
+class TestDeployment:
+    def test_dev_login_is_off_on_vercel_unless_asked_for(self, client, monkeypatch):
+        monkeypatch.setenv("VERCEL", "1")
+        assert client.get("/me", headers=as_user(KARIM)).status_code == 401
+        monkeypatch.setenv("DEV_LOGIN", "1")
+        assert client.get("/me", headers=as_user(KARIM)).status_code == 200
+
+    @pytest.mark.parametrize("url", ["postgres://u:p@host/db?sslmode=require", "postgresql://u:p@host/db?sslmode=require",
+                                     "postgresql+psycopg://u:p@host/db?sslmode=require"])
+    def test_database_urls_get_the_psycopg_driver(self, url):
+        from app.db import normalize_url
+        assert normalize_url(url) == "postgresql+psycopg://u:p@host/db?sslmode=require"

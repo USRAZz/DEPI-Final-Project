@@ -1,3 +1,4 @@
+import os
 from typing import Annotated
 
 from fastapi import Depends, Header, HTTPException, Request, status
@@ -15,12 +16,19 @@ def get_gateway(request: Request) -> Gateway:
     return request.app.state.gateway
 
 
+def dev_login_enabled() -> bool:
+    """On by default locally; on a Vercel deployment only when DEV_LOGIN=1 is set on purpose."""
+    return not os.environ.get("VERCEL") or os.environ.get("DEV_LOGIN") == "1"
+
+
 def current_user(
     store: Annotated[DataStore, Depends(get_store)],
     x_user_id: Annotated[int | None, Header()] = None,
 ) -> User:
-    # Development login: the caller names its user in X-User-Id.
-    # Replaced by JWT (weeks 3-5); never enable this outside local development.
+    # Development login: the caller names its user in X-User-Id. Anyone who can reach the
+    # api can claim any user, so it is off on public deployments. Replaced by JWT.
+    if not dev_login_enabled():
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "sign-in is not available on this deployment")
     user = store.user(x_user_id) if x_user_id is not None else None
     if user is None or not user.is_active:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "not signed in")
