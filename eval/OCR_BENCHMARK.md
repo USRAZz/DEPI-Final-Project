@@ -166,3 +166,13 @@ Fixes in `ocr.py`: overlapping boxes from the two passes are compared as one gro
 | Header pass, group merge + amount fix | **1,969/2,032 (96.9%)** | **130/130** | **130/130** | **130/130** | 168/228 | 9.24 s |
 
 Every field outside the item table now matches on all 130 invoices. The 63 remaining misses are 60 Arabic descriptions and 3 line totals, all in the item table of STRESS-tier pages (STRESS-004 line 2 is a label mismatch, see above).
+
+**Experiments on the 60 remaining Arabic descriptions (2026-11-10), none adopted.** The pages that miss are small scans (median 793x1122 px, about 96 dpi; Arabic table lines 10-23 px tall vs 35 px on the clean INV pages), so the strokes are not in the image.
+
+| Experiment (26 invoices with description misses) | Arabic descriptions / other effect | Time |
+|---|---|---|
+| Recognizer-only re-read of each table line crop: plain, 2x, 2x/3x stroke thickening, Otsu, median+sharpen, gamma darken | best 7/68 vs 8/68 baseline | ~3 s/26 pages |
+| Embedded scan (current) vs PDF render at 200 / 300 dpi | descriptions 11 / 14 / 20 of 71, but total 455 / 453 / 453 of 518 (vendors and amounts lost) | 7.1 / 9.9 / 17.7 s/page |
+| Local vision LLM via Ollama: gemma4:e4b, qwen3.8 | gemma: "no Arabic text"; qwen3.8 read `خدمة صيانة` as `خدمة عمولة` (invented a plausible word) | 52 s/line |
+
+Only `arabic_PP-OCRv5_mobile_rec` exists for Arabic in PaddleOCR (no server model). Candidates not tried (need multi-GB downloads): QARI-OCR (Qwen2-VL-2B fine-tuned on degraded Arabic) and PaddleOCR-VL. A VLM that guesses words is risky for amounts and names; if tried, use it only for descriptions and keep the PaddleOCR reading next to it.
