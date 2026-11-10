@@ -19,9 +19,6 @@ from securefin_contracts import (
     InvoiceData,
     InvoiceSource,
     InvoiceStatus,
-    Money,
-    PaymentRequest,
-    PaymentRequestStatus,
     RiskLevel,
     RiskScore,
     Role,
@@ -29,6 +26,8 @@ from securefin_contracts import (
     User,
     Vendor,
 )
+
+from .models import PaymentRecord
 
 T = TypeVar("T")
 
@@ -53,7 +52,7 @@ class Store:
     bank_accounts: dict[int, BankAccount] = field(default_factory=dict)
     times_paid: dict[int, int] = field(default_factory=dict)
     invoices: dict[int, Invoice] = field(default_factory=dict)
-    payment_requests: dict[int, PaymentRequest] = field(default_factory=dict)
+    payment_requests: dict[int, PaymentRecord] = field(default_factory=dict)
     risk: dict[int, RiskScore] = field(default_factory=dict)
     bank_change_requested_by: dict[int, int] = field(default_factory=dict)
 
@@ -72,7 +71,7 @@ class Store:
     def invoice(self, invoice_id: int, company_id: int) -> Invoice | None:
         return self._scoped(self.invoices, invoice_id, company_id)
 
-    def payment_request(self, request_id: int, company_id: int) -> PaymentRequest | None:
+    def payment_request(self, request_id: int, company_id: int) -> PaymentRecord | None:
         return self._scoped(self.payment_requests, request_id, company_id)
 
     def bank_account(self, account_id: int, company_id: int) -> BankAccount | None:
@@ -81,10 +80,10 @@ class Store:
     def vendor_accounts(self, vendor_id: int, company_id: int) -> list[BankAccount]:
         return [a for a in self.bank_accounts.values() if a.vendor_id == vendor_id and a.company_id == company_id]
 
-    def pending_requests(self, company_id: int) -> list[PaymentRequest]:
+    def pending_requests(self, company_id: int) -> list[PaymentRecord]:
         return sorted(
             (p for p in self.payment_requests.values()
-             if p.company_id == company_id and p.status == PaymentRequestStatus.PENDING_APPROVAL),
+             if p.company_id == company_id and p.status == InvoiceStatus.PENDING_APPROVAL),
             key=lambda p: p.created_at,
         )
 
@@ -95,7 +94,7 @@ class Store:
         return sum(1 for a in self.bank_accounts.values()
                    if a.company_id == company_id and a.status == BankAccountStatus.ON_HOLD)
 
-    def set_request_status(self, request_id: int, status: PaymentRequestStatus) -> None:
+    def set_request_status(self, request_id: int, status: InvoiceStatus) -> None:
         self.payment_requests[request_id] = self.payment_requests[request_id].model_copy(update={"status": status})
 
 
@@ -148,10 +147,10 @@ def seeded_store() -> Store:
     )
 
     def add_request(rid: int, vendor: int, account: int, invoice: int, amount: str, by: int, at: str) -> None:
-        s.payment_requests[rid] = PaymentRequest(
-            id=rid, company_id=DELTA, vendor_id=vendor, bank_account_id=account, invoice_ids=[invoice],
-            money=Money(amount=Decimal(amount)), status=PaymentRequestStatus.PENDING_APPROVAL,
-            created_by=by, created_at=_at(at),
+        s.payment_requests[rid] = PaymentRecord(
+            id=rid, company_id=DELTA, vendor_id=vendor, bank_account_id=account, invoice_id=invoice,
+            amount=Decimal(amount), currency="EGP", status=InvoiceStatus.PENDING_APPROVAL,
+            creator_id=by, created_at=_at(at),
         )
 
     add_request(PR_187, NILE, ACC_NILE, INV_0412, "15400.00", SARA, "2026-11-02T10:00:00")

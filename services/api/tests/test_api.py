@@ -19,7 +19,7 @@ from app.store import (
     seeded_store,
 )
 from fastapi.testclient import TestClient
-from securefin_contracts import BankAccountStatus, Money
+from securefin_contracts import BankAccountStatus
 
 
 @pytest.fixture
@@ -66,7 +66,7 @@ def test_dashboard_counts_and_money_as_string(client):
     assert body["flagged_count"] == 1
     assert body["on_hold_count"] == 1
     assert body["month_spend"] == {"amount": "486250.00", "currency": "EGP"}
-    assert body["pending"][0]["request"]["money"]["amount"] == "15400.00"
+    assert body["pending"][0]["request"]["amount"] == "15400.00"
 
 
 class TestCompanyIsolation:
@@ -97,14 +97,15 @@ class TestApprovals:
     def test_roles_without_approval_rights_are_refused(self, client, user):
         assert approve(client, PR_187, user).status_code == 403
 
-    def test_two_approvals_allow_and_approve(self, client):
+    def test_two_approvals_allow_but_wait_for_execution(self, client):
         first = approve(client, PR_187, MONA)
         assert first.status_code == 201
         assert first.json()["gateway"]["decision"] == "PENDING_APPROVAL"
 
         second = approve(client, PR_187, KARIM).json()
         assert second["gateway"]["decision"] == "ALLOW"
-        assert second["request"]["status"] == "approved"
+        # Stays PENDING_APPROVAL: execute-check only allows a payment in that status.
+        assert second["request"]["status"] == "PENDING_APPROVAL"
         assert [a["approver"]["full_name"] for a in second["approvals"]] == ["Mona", "Karim Ashraf"]
 
     def test_same_approver_cannot_approve_twice(self, client):
@@ -115,7 +116,7 @@ class TestApprovals:
     def test_one_rejection_blocks(self, client):
         body = approve(client, PR_187, MONA, approved=False).json()
         assert body["gateway"]["decision"] == "BLOCK"
-        assert body["request"]["status"] == "rejected"
+        assert body["request"]["status"] == "REJECTED"
         assert approve(client, PR_187, KARIM).status_code == 409
 
     def test_cannot_approve_payment_to_unverified_account(self, client, store):
@@ -131,10 +132,10 @@ class TestSignature:
         record = gateway.approvals(PR_187)[0]
         request = store.payment_requests[PR_187]
         iban = store.bank_accounts[request.bank_account_id].iban
-        assert gateway.verify(record, request.money, iban)
+        assert gateway.verify(record, request.amount, request.currency, iban)
 
-        assert not gateway.verify(record, Money(amount=Decimal("99999.00")), iban)
-        assert not gateway.verify(record, request.money, "EG450019000500000000099112233")
+        assert not gateway.verify(record, Decimal("99999.00"), request.currency, iban)
+        assert not gateway.verify(record, request.amount, request.currency, "EG450019000500000000099112233")
 
 
 class BrokenGateway(LocalGateway):
@@ -157,7 +158,7 @@ class TestFailClosed:
 
     def test_approval_fails_when_gateway_down(self, client, store):
         assert approve(client, PR_187, MONA).status_code == 503
-        assert store.payment_requests[PR_187].status == "pending_approval"
+        assert store.payment_requests[PR_187].status == "PENDING_APPROVAL"
 
 
 def test_bank_change_view(client):
@@ -166,3 +167,25 @@ def test_bank_change_view(client):
     assert body["proposed"]["status"] == "on_hold"
     assert body["proposed"]["times_paid"] == 0
     assert body["requested_by"]["id"] == OMAR
+
+
+class TestPaymentInfoForGateway:
+    @pytest.fixture(autouse=True)
+    def service_token(self, monkeypatch):
+        monkeypatch.setenv("INTERNAL_SERVICE_TOKEN", "test-service-token")
+
+    def test_returns_payment_request_info(self, client):
+        res = client.get(f"/payments/{PR_187}", headers={"X-Service-Token": "test-service-token"})
+        assert res.status_code == 200
+        assert res.json() == {
+            "id": PR_187, "company_id": 1, "creator_id": SARA, "invoice_id": INV_0412, "vendor_id": 1,
+            "amount": "15400.00", "currency": "EGP", "status": "PENDING_APPROVAL",
+            "created_at": "2026-11-02T10:00:00Z",
+        }
+
+    def test_unknown_payment_is_404(self, client):
+        assert client.get("/payments/9999", headers={"X-Service-Token": "test-service-token"}).status_code == 404
+
+    @pytest.mark.parametrize("headers", [{}, {"X-Service-Token": "wrong"}, as_user(KARIM)])
+    def test_needs_the_service_token(self, client, headers):
+        assert client.get(f"/payments/{PR_187}", headers=headers).status_code == 401

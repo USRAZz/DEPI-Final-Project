@@ -6,7 +6,9 @@ These are views, not new shared shapes, so they live here and not in contracts/.
 from datetime import datetime
 
 from pydantic import BaseModel
-from securefin_contracts import BankAccount, GatewayDecision, Money, PaymentRequest, RiskScore, User, Vendor
+from securefin_contracts import BankAccount, GatewayDecision, Money, RiskScore, User, Vendor
+
+from .models import PaymentRecord
 
 
 class AccountView(BankAccount):
@@ -14,7 +16,7 @@ class AccountView(BankAccount):
 
 
 class PendingRow(BaseModel):
-    request: PaymentRequest
+    request: PaymentRecord
     vendor: Vendor
     created_by: User
     risk: RiskScore | None
@@ -37,7 +39,7 @@ class ApprovalView(BaseModel):
 
 
 class PaymentRequestView(BaseModel):
-    request: PaymentRequest
+    request: PaymentRecord
     vendor: Vendor
     account: AccountView
     created_by: User

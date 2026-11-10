@@ -1,6 +1,6 @@
 from decimal import Decimal
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from securefin_contracts import (
     AuthorizeRequest,
     BankAccount,
@@ -8,9 +8,9 @@ from securefin_contracts import (
     Decision,
     GatewayDecision,
     Invoice,
+    InvoiceStatus,
     Money,
-    PaymentRequest,
-    PaymentRequestStatus,
+    PaymentRequestInfo,
     ProposedAction,
     Role,
     User,
@@ -19,6 +19,8 @@ from securefin_contracts import (
 from .clients import gateway_authorize
 from .deps import GatewayDep, StoreDep, UserDep
 from .gateway import DUAL_APPROVAL_LIMIT, ApprovalRefused, Gateway
+from .models import PaymentRecord
+from .risk_features import require_service_token
 from .schemas import (
     AccountView,
     ApprovalIn,
@@ -47,7 +49,7 @@ def _account_view(store: Store, account: BankAccount) -> AccountView:
     return AccountView(**account.model_dump(), times_paid=store.times_paid.get(account.id, 0))
 
 
-def _decide(gateway: Gateway, request: PaymentRequest, store: Store) -> GatewayDecision:
+def _decide(gateway: Gateway, request: PaymentRecord, store: Store) -> GatewayDecision:
     """Ask the gateway. Any failure is a BLOCK: no decision means no payment."""
     try:
         return gateway.decide(request, store.risk.get(request.id))
@@ -81,14 +83,14 @@ def dashboard(user: UserDep, store: StoreDep) -> DashboardView:
         month_spend=MONTH_SPEND,
         invoices_paid=INVOICES_PAID,
         pending_count=len(pending),
-        above_limit_count=sum(p.money.amount > DUAL_APPROVAL_LIMIT for p in pending),
+        above_limit_count=sum(p.amount > DUAL_APPROVAL_LIMIT for p in pending),
         flagged_count=store.flagged_invoice_count(user.company_id),
         on_hold_count=store.on_hold_account_count(user.company_id),
         pending=[
             PendingRow(
                 request=p,
                 vendor=store.vendors[p.vendor_id],
-                created_by=store.users[p.created_by],
+                created_by=store.users[p.creator_id],
                 risk=store.risk.get(p.id),
             )
             for p in pending
@@ -104,7 +106,7 @@ def get_invoice(invoice_id: int, user: UserDep, store: StoreDep) -> Invoice:
     return invoice
 
 
-def _payment_view(request: PaymentRequest, store: Store, gateway: Gateway) -> PaymentRequestView:
+def _payment_view(request: PaymentRecord, store: Store, gateway: Gateway) -> PaymentRequestView:
     account = store.bank_account(request.bank_account_id, request.company_id)
     if account is None:
         raise _not_found("bank account")
@@ -112,7 +114,7 @@ def _payment_view(request: PaymentRequest, store: Store, gateway: Gateway) -> Pa
         request=request,
         vendor=store.vendors[request.vendor_id],
         account=_account_view(store, account),
-        created_by=store.users[request.created_by],
+        created_by=store.users[request.creator_id],
         risk=store.risk.get(request.id),
         gateway=_decide(gateway, request, store),
         approvals=[
@@ -120,6 +122,15 @@ def _payment_view(request: PaymentRequest, store: Store, gateway: Gateway) -> Pa
             for r in gateway.approvals(request.id)
         ],
     )
+
+
+@router.get("/payments/{request_id}", dependencies=[Depends(require_service_token)], include_in_schema=False)
+def get_payment_info(request_id: int, store: StoreDep) -> PaymentRequestInfo:
+    """Service-to-service read for the gateway (approvals and execute-check). Needs X-Service-Token."""
+    request = store.payment_requests.get(request_id)
+    if request is None:
+        raise _not_found("payment request")
+    return request.info()
 
 
 @router.get("/payment-requests/{request_id}")
@@ -139,7 +150,7 @@ def decide_payment_request(
         raise _not_found("payment request")
     if user.role not in APPROVER_ROLES:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "your role cannot approve payments")
-    if request.status != PaymentRequestStatus.PENDING_APPROVAL:
+    if request.status != InvoiceStatus.PENDING_APPROVAL:
         raise HTTPException(status.HTTP_409_CONFLICT, "request is not awaiting approval")
     # The bank account must still be verified: an approval signs this exact account.
     account = store.bank_account(request.bank_account_id, user.company_id)
@@ -154,11 +165,10 @@ def decide_payment_request(
     except Exception:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "gateway unavailable; nothing was recorded") from None
 
-    decision = _decide(gateway, request, store)
-    if decision.decision == Decision.ALLOW:
-        store.set_request_status(request.id, PaymentRequestStatus.APPROVED)
-    elif "REJECTED_BY_APPROVER" in decision.reasons:
-        store.set_request_status(request.id, PaymentRequestStatus.REJECTED)
+    # Enough approvals keeps the status at PENDING_APPROVAL: the gateway's execute-check
+    # only allows a payment in that status, and execution then sets PAID_SIMULATED.
+    if "REJECTED_BY_APPROVER" in _decide(gateway, request, store).reasons:
+        store.set_request_status(request.id, InvoiceStatus.REJECTED)
     return _payment_view(store.payment_requests[request.id], store, gateway)
 
 
