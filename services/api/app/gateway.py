@@ -1,91 +1,75 @@
-"""Approval decisions for the screens, until services/gateway serves them.
+"""Client for services/gateway's approval endpoints.
 
-LocalGateway implements the agreed rules in process so the API and frontend can be
-built against them. The API never decides on its own: it asks the gateway, and if
-the gateway fails, the answer is BLOCK (fail closed).
+The api never decides on a payment itself: approvals go to POST /v1/approvals/{id} and
+execution needs POST /v1/execute-check to say allowed. Anything the client cannot read
+as a clear answer is GatewayUnavailable, and the caller treats it as "not approved".
 """
 
-import hashlib
-import hmac
-import json
 import os
-from datetime import UTC, datetime
-from decimal import Decimal
 from typing import Protocol
 
-from securefin_contracts import ApprovalRecord, BankAccount, Decision, GatewayDecision, RiskLevel, RiskScore, User
+import httpx
+from pydantic import ValidationError
+from securefin_contracts import ApprovalRequest, ApprovalResult, ExecuteCheckRequest, ExecuteCheckResult
 
-from .models import PaymentRecord
+DEFAULT_GATEWAY_URL = "http://gateway:8000"  # docker service name; use http://localhost:8001 outside Docker
+DEFAULT_TIMEOUT_S = 5.0
 
-DUAL_APPROVAL_LIMIT = Decimal(os.getenv("DUAL_APPROVAL_THRESHOLD_EGP", "10000"))
+# Status codes on which the gateway answered on purpose, with reasons in `detail`.
+_REFUSALS = {403, 404, 409, 422}
+
+
+class GatewayUnavailable(Exception):
+    """The gateway was down, too slow, or answered with something unusable. Nothing was approved."""
 
 
 class ApprovalRefused(Exception):
-    def __init__(self, code: str):
-        super().__init__(code)
-        self.code = code
+    def __init__(self, status_code: int, reasons: list[str]):
+        super().__init__("; ".join(reasons))
+        self.status_code = status_code
+        self.reasons = reasons
 
 
 class Gateway(Protocol):
-    def decide(self, request: PaymentRecord, risk: RiskScore | None) -> GatewayDecision: ...
-    def approvals(self, request_id: int) -> list[ApprovalRecord]: ...
-    def record(self, request: PaymentRecord, account: BankAccount, approver: User, approved: bool) -> ApprovalRecord: ...
+    def submit_approval(self, req: ApprovalRequest) -> ApprovalResult: ...
+    def execute_check(self, req: ExecuteCheckRequest) -> ExecuteCheckResult: ...
 
 
-class LocalGateway:
-    def __init__(self, signing_key: bytes):
-        self._key = signing_key
-        self._approvals: dict[int, list[ApprovalRecord]] = {}
+def _reasons(resp: httpx.Response) -> list[str]:
+    try:
+        detail = resp.json().get("detail")
+    except (ValueError, AttributeError):
+        return [f"gateway refused (HTTP {resp.status_code})"]
+    if isinstance(detail, list):
+        return [d if isinstance(d, str) else str(d.get("msg", d)) for d in detail]
+    return [str(detail)] if detail else [f"gateway refused (HTTP {resp.status_code})"]
 
-    def approvals(self, request_id: int) -> list[ApprovalRecord]:
-        return list(self._approvals.get(request_id, []))
 
-    def decide(self, request: PaymentRecord, risk: RiskScore | None) -> GatewayDecision:
-        reasons: list[str] = []
-        required = 1
-        if request.amount > DUAL_APPROVAL_LIMIT:
-            required = 2
-            reasons.append("ABOVE_DUAL_APPROVAL_LIMIT")
-        if risk is None:
-            reasons.append("RISK_NOT_ASSESSED")
-        elif risk.level == RiskLevel.HIGH:
-            reasons.append("HIGH_RISK")
+class HttpGateway:
+    def __init__(self, base_url: str, timeout_s: float = DEFAULT_TIMEOUT_S, transport: httpx.BaseTransport | None = None):
+        self._client = httpx.Client(base_url=base_url, timeout=timeout_s, transport=transport)
 
-        records = self._approvals.get(request.id, [])
-        if any(not r.approve for r in records):
-            decision = Decision.BLOCK
-            reasons.append("REJECTED_BY_APPROVER")
-        elif risk is not None and sum(r.approve for r in records) >= required:
-            decision = Decision.ALLOW
-        else:
-            decision = Decision.PENDING_APPROVAL
+    def _post(self, path: str, body, result_type):
+        try:
+            resp = self._client.post(path, json=body.model_dump(mode="json"))
+        except httpx.HTTPError as e:
+            raise GatewayUnavailable(type(e).__name__) from e
+        if resp.status_code in _REFUSALS:
+            raise ApprovalRefused(resp.status_code, _reasons(resp))
+        if resp.status_code != 200:
+            raise GatewayUnavailable(f"HTTP {resp.status_code}: {'; '.join(_reasons(resp))}")
+        try:
+            return result_type.model_validate_json(resp.content)
+        except ValidationError as e:
+            raise GatewayUnavailable("unreadable answer") from e
 
-        return GatewayDecision(
-            decision=decision, reasons=reasons, required_approvers=required,
-            risk_score=risk.score if risk else None,
-        )
+    def submit_approval(self, req: ApprovalRequest) -> ApprovalResult:
+        return self._post(f"/v1/approvals/{req.payment_request_id}", req, ApprovalResult)
 
-    def record(self, request: PaymentRecord, account: BankAccount, approver: User, approved: bool) -> ApprovalRecord:
-        if approver.id == request.creator_id:
-            raise ApprovalRefused("SELF_APPROVAL")
-        if any(r.approver_id == approver.id for r in self._approvals.get(request.id, [])):
-            raise ApprovalRefused("ALREADY_DECIDED")
+    def execute_check(self, req: ExecuteCheckRequest) -> ExecuteCheckResult:
+        return self._post("/v1/execute-check", req, ExecuteCheckResult)
 
-        signed_at = datetime.now(UTC)
-        record = ApprovalRecord(
-            payment_request_id=request.id, approver_id=approver.id, approve=approved, signed_at=signed_at,
-            hmac_signature=self._sign(request.id, request.amount, request.currency, account.iban, approver.id, signed_at),
-        )
-        self._approvals.setdefault(request.id, []).append(record)
-        return record
 
-    def _sign(self, request_id: int, amount: Decimal, currency: str, iban: str, approver_id: int,
-              signed_at: datetime) -> str:
-        # Placeholder HMAC over exactly what is approved: the amount and the account.
-        payload = json.dumps([request_id, str(amount), currency, iban, approver_id, signed_at.isoformat()])
-        return hmac.new(self._key, payload.encode(), hashlib.sha256).hexdigest()
-
-    def verify(self, record: ApprovalRecord, amount: Decimal, currency: str, iban: str) -> bool:
-        """True only if the signature covers exactly this amount and account."""
-        expected = self._sign(record.payment_request_id, amount, currency, iban, record.approver_id, record.signed_at)
-        return hmac.compare_digest(expected, record.hmac_signature)
+def build_gateway() -> HttpGateway:
+    timeout_s = float(os.environ.get("GATEWAY_TIMEOUT_MS", DEFAULT_TIMEOUT_S * 1000)) / 1000
+    return HttpGateway(os.environ.get("GATEWAY_URL", DEFAULT_GATEWAY_URL), timeout_s)

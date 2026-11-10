@@ -1,10 +1,8 @@
-from decimal import Decimal
-
 import pytest
-from app.gateway import LocalGateway
 from app.main import app as default_app
 from app.main import create_app
 from app.store import (
+    ACC_NILE,
     EGPACK,
     INV_0412,
     KARIM,
@@ -13,23 +11,25 @@ from app.store import (
     OUTSIDER,
     PR_187,
     PR_188,
+    PR_189,
     PR_190,
     SARA,
     VIEWER,
     seeded_store,
 )
 from fastapi.testclient import TestClient
-from securefin_contracts import BankAccountStatus
-
-
-@pytest.fixture
-def gateway():
-    return LocalGateway(b"test-key")
+from securefin_contracts import ApprovalRequest, BankAccountStatus, ExecuteCheckRequest
+from tests.fakes import DownGateway, FakeGateway
 
 
 @pytest.fixture
 def store():
     return seeded_store()
+
+
+@pytest.fixture
+def gateway(store):
+    return FakeGateway(store)
 
 
 @pytest.fixture
@@ -41,8 +41,13 @@ def as_user(user_id):
     return {"X-User-Id": str(user_id)}
 
 
-def approve(client, request_id, user_id, approved=True):
-    return client.post(f"/payment-requests/{request_id}/approvals", json={"approved": approved}, headers=as_user(user_id))
+def approve(client, request_id, user_id, approved=True, **extra):
+    body = {"approved": approved, **extra}
+    return client.post(f"/payment-requests/{request_id}/approvals", json=body, headers=as_user(user_id))
+
+
+def execute(client, request_id, user_id):
+    return client.post(f"/payment-requests/{request_id}/execute", headers=as_user(user_id))
 
 
 def test_health():
@@ -77,33 +82,44 @@ class TestCompanyIsolation:
         assert client.get(f"/vendors/{EGPACK}/bank-change", headers=headers).status_code == 404
         assert client.get("/dashboard", headers=headers).json()["pending_count"] == 0
 
-    def test_other_company_cannot_approve(self, client):
+    def test_other_company_cannot_approve_or_execute(self, client, gateway):
         assert approve(client, PR_187, OUTSIDER).status_code == 404
+        assert execute(client, PR_187, OUTSIDER).status_code == 404
+        assert gateway.sent == []
 
 
 class TestApprovals:
-    def test_large_high_risk_request_is_held_for_two_approvals(self, client):
-        gw = client.get(f"/payment-requests/{PR_187}", headers=as_user(KARIM)).json()["gateway"]
-        assert gw["decision"] == "PENDING_APPROVAL"
-        assert gw["required_approvers"] == 2
-        assert gw["risk_score"] == 72
-        assert set(gw["reasons"]) == {"ABOVE_DUAL_APPROVAL_LIMIT", "HIGH_RISK"}
+    def test_before_any_approval_two_are_expected_above_the_limit(self, client):
+        approval = client.get(f"/payment-requests/{PR_187}", headers=as_user(KARIM)).json()["approval"]
+        assert approval == {"status": "PENDING_APPROVAL", "approvals_received": 0, "approvals_required": 2, "reasons": []}
 
-    def test_creator_cannot_approve_own_request(self, client):
+    def test_role_and_company_are_sent_from_the_session(self, client, gateway):
+        approve(client, PR_187, MONA, comment="checked the invoice")
+        assert gateway.sent == [ApprovalRequest(payment_request_id=PR_187, approver_id=MONA, approve=True,
+                                                comment="checked the invoice", approver_role="approver", company_id=1)]
+
+    def test_client_cannot_send_role_or_company(self, client, gateway):
+        assert approve(client, PR_187, MONA, approver_role="admin").status_code == 422
+        assert approve(client, PR_187, MONA, company_id=2).status_code == 422
+        assert gateway.sent == []
+
+    def test_creator_is_refused_with_the_gateways_reasons(self, client):
         res = approve(client, PR_190, KARIM)
-        assert res.status_code == 403 and res.json()["detail"] == "SELF_APPROVAL"
+        assert res.status_code == 403
+        assert res.json()["detail"] == ["maker-checker: the creator cannot approve their own payment request"]
 
     @pytest.mark.parametrize("user", [SARA, VIEWER])
-    def test_roles_without_approval_rights_are_refused(self, client, user):
+    def test_roles_without_approval_rights_never_reach_the_gateway(self, client, gateway, user):
         assert approve(client, PR_187, user).status_code == 403
+        assert gateway.sent == []
 
-    def test_two_approvals_allow_but_wait_for_execution(self, client):
+    def test_two_approvals_approve_but_wait_for_execution(self, client):
         first = approve(client, PR_187, MONA)
         assert first.status_code == 201
-        assert first.json()["gateway"]["decision"] == "PENDING_APPROVAL"
+        assert first.json()["approval"]["status"] == "PENDING_APPROVAL"
 
         second = approve(client, PR_187, KARIM).json()
-        assert second["gateway"]["decision"] == "ALLOW"
+        assert second["approval"] == {"status": "APPROVED", "approvals_received": 2, "approvals_required": 2, "reasons": []}
         # Stays PENDING_APPROVAL: execute-check only allows a payment in that status.
         assert second["request"]["status"] == "PENDING_APPROVAL"
         assert [a["approver"]["full_name"] for a in second["approvals"]] == ["Mona", "Karim Ashraf"]
@@ -111,54 +127,74 @@ class TestApprovals:
     def test_same_approver_cannot_approve_twice(self, client):
         approve(client, PR_187, MONA)
         res = approve(client, PR_187, MONA)
-        assert res.status_code == 409 and res.json()["detail"] == "ALREADY_DECIDED"
+        assert res.status_code == 409 and res.json()["detail"] == ["this approver has already decided"]
 
-    def test_one_rejection_blocks(self, client):
+    def test_one_rejection_rejects_the_request(self, client):
         body = approve(client, PR_187, MONA, approved=False).json()
-        assert body["gateway"]["decision"] == "BLOCK"
+        assert body["approval"]["status"] == "REJECTED"
         assert body["request"]["status"] == "REJECTED"
         assert approve(client, PR_187, KARIM).status_code == 409
 
-    def test_cannot_approve_payment_to_unverified_account(self, client, store):
+    def test_cannot_approve_payment_to_unverified_account(self, client, store, gateway):
         account_id = store.payment_requests[PR_188].bank_account_id
         store.bank_accounts[account_id] = store.bank_accounts[account_id].model_copy(update={"status": BankAccountStatus.ON_HOLD})
         res = approve(client, PR_188, MONA)
         assert res.status_code == 409 and "not verified" in res.json()["detail"]
+        assert gateway.sent == []
 
 
-class TestSignature:
-    def test_signature_covers_amount_and_account(self, client, gateway, store):
+class TestExecution:
+    def test_pays_only_after_execute_check_allows(self, client, gateway, store):
         approve(client, PR_187, MONA)
-        record = gateway.approvals(PR_187)[0]
-        request = store.payment_requests[PR_187]
-        iban = store.bank_accounts[request.bank_account_id].iban
-        assert gateway.verify(record, request.amount, request.currency, iban)
+        approve(client, PR_187, KARIM)
+        res = execute(client, PR_187, SARA)
+        assert res.status_code == 200
+        assert res.json()["executed"] is True
+        assert res.json()["request"]["status"] == "PAID_SIMULATED"
+        assert gateway.sent[-1] == ExecuteCheckRequest(payment_request_id=PR_187, requested_by=SARA, company_id=1)
+        assert store.times_paid[ACC_NILE] == 10
 
-        assert not gateway.verify(record, Decimal("99999.00"), request.currency, iban)
-        assert not gateway.verify(record, request.amount, request.currency, "EG450019000500000000099112233")
+    def test_not_enough_approvals_is_refused_and_nothing_is_paid(self, client, store):
+        approve(client, PR_187, MONA)
+        res = execute(client, PR_187, SARA)
+        assert res.status_code == 409
+        assert res.json()["detail"] == ["1 valid approval(s), 2 required"]
+        assert store.payment_requests[PR_187].status == "PENDING_APPROVAL"
 
+    def test_cannot_pay_twice(self, client):
+        approve(client, PR_189, MONA)
+        assert execute(client, PR_189, SARA).status_code == 200
+        res = execute(client, PR_189, SARA)
+        assert res.status_code == 409 and "PAID_SIMULATED" in res.json()["detail"][0]
 
-class BrokenGateway(LocalGateway):
-    def decide(self, request, risk):
-        raise TimeoutError("gateway too slow")
+    @pytest.mark.parametrize("user", [MONA, VIEWER])
+    def test_roles_without_execute_rights_are_refused(self, client, user):
+        approve(client, PR_189, MONA)
+        assert execute(client, PR_189, user).status_code == 403
 
-    def record(self, request, account, approver, approved):
-        raise ConnectionError("gateway down")
+    def test_account_put_on_hold_after_approval_blocks_payment(self, client, store, gateway):
+        approve(client, PR_189, MONA)
+        account_id = store.payment_requests[PR_189].bank_account_id
+        store.bank_accounts[account_id] = store.bank_accounts[account_id].model_copy(update={"status": BankAccountStatus.ON_HOLD})
+        assert execute(client, PR_189, SARA).status_code == 409
+        assert not any(isinstance(s, ExecuteCheckRequest) for s in gateway.sent)
 
 
 class TestFailClosed:
     @pytest.fixture
     def gateway(self):
-        return BrokenGateway(b"test-key")
-
-    def test_gateway_down_means_block(self, client):
-        gw = client.get(f"/payment-requests/{PR_187}", headers=as_user(KARIM)).json()["gateway"]
-        assert gw["decision"] == "BLOCK"
-        assert gw["reasons"] == ["GATEWAY_UNAVAILABLE"]
+        return DownGateway()
 
     def test_approval_fails_when_gateway_down(self, client, store):
-        assert approve(client, PR_187, MONA).status_code == 503
+        res = approve(client, PR_187, MONA)
+        assert res.status_code == 503 and res.json()["detail"] == ["gateway unavailable: nothing was approved"]
         assert store.payment_requests[PR_187].status == "PENDING_APPROVAL"
+        assert store.approvals == {}
+
+    def test_payment_fails_when_gateway_down(self, client, store):
+        res = execute(client, PR_189, SARA)
+        assert res.status_code == 503 and res.json()["detail"] == ["gateway unavailable: nothing was paid"]
+        assert store.payment_requests[PR_189].status == "PENDING_APPROVAL"
 
 
 def test_bank_change_view(client):

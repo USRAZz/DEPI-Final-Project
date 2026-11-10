@@ -1,12 +1,15 @@
+import os
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from securefin_contracts import (
+    ApprovalRequest,
+    ApprovalStatus,
     AuthorizeRequest,
     BankAccount,
     BankAccountStatus,
     Decision,
-    GatewayDecision,
+    ExecuteCheckRequest,
     Invoice,
     InvoiceStatus,
     Money,
@@ -18,15 +21,17 @@ from securefin_contracts import (
 
 from .clients import gateway_authorize
 from .deps import GatewayDep, StoreDep, UserDep
-from .gateway import DUAL_APPROVAL_LIMIT, ApprovalRefused, Gateway
+from .gateway import ApprovalRefused, GatewayUnavailable
 from .models import PaymentRecord
 from .risk_features import require_service_token
 from .schemas import (
     AccountView,
     ApprovalIn,
+    ApprovalState,
     ApprovalView,
     BankChangeView,
     DashboardView,
+    ExecutionView,
     PaymentRequestView,
     PendingRow,
 )
@@ -35,6 +40,10 @@ from .store import Store
 router = APIRouter()
 
 APPROVER_ROLES = {Role.ADMIN, Role.APPROVER}
+EXECUTOR_ROLES = {Role.ADMIN, Role.ACCOUNTANT}
+
+# For the screens only (how many approvals to expect); the gateway's policy decides.
+DUAL_APPROVAL_LIMIT = Decimal(os.getenv("DUAL_APPROVAL_THRESHOLD_EGP", "10000"))
 
 # Sample figure until paid payments are stored.
 MONTH_SPEND = Money(amount=Decimal("486250.00"))
@@ -49,12 +58,21 @@ def _account_view(store: Store, account: BankAccount) -> AccountView:
     return AccountView(**account.model_dump(), times_paid=store.times_paid.get(account.id, 0))
 
 
-def _decide(gateway: Gateway, request: PaymentRecord, store: Store) -> GatewayDecision:
-    """Ask the gateway. Any failure is a BLOCK: no decision means no payment."""
-    try:
-        return gateway.decide(request, store.risk.get(request.id))
-    except Exception:
-        return GatewayDecision(decision=Decision.BLOCK, reasons=["GATEWAY_UNAVAILABLE"])
+def _verified_account(store: Store, request: PaymentRecord) -> BankAccount:
+    # The account must still be verified: the payment goes to this exact account.
+    account = store.bank_account(request.bank_account_id, request.company_id)
+    if account is None or account.status != BankAccountStatus.VERIFIED:
+        raise HTTPException(status.HTTP_409_CONFLICT, "bank account is not verified")
+    return account
+
+
+def _approval_state(store: Store, request: PaymentRecord) -> ApprovalState:
+    result = store.approval_results.get(request.id)
+    if result is not None:
+        return ApprovalState(status=result.status, approvals_received=result.approvals_received,
+                             approvals_required=result.approvals_required, reasons=result.reasons)
+    expected = 2 if request.amount > DUAL_APPROVAL_LIMIT or request.currency != "EGP" else 1
+    return ApprovalState(status=ApprovalStatus.PENDING_APPROVAL, approvals_received=0, approvals_required=expected)
 
 
 @router.get("/health")
@@ -64,10 +82,11 @@ def health() -> dict[str, str]:
 
 @router.post("/payments/propose")
 async def propose_payment(action: ProposedAction):
-    """Skeleton path: agent proposal -> gateway decision -> execute only on ALLOW. (Auth is stubbed.)"""
+    """Skeleton path: agent proposal -> gateway decision. (Auth is stubbed.)
+    A payment request itself is only paid through POST /payment-requests/{id}/execute."""
     req = AuthorizeRequest(user_id=1, role=Role.ACCOUNTANT, company_id=1, action=action, request_id="demo-1")
     decision = await gateway_authorize(req)
-    executed = decision.decision == Decision.ALLOW  # TODO(Karim): real simulated executor + HMAC re-check
+    executed = decision.decision == Decision.ALLOW
     return {"decision": decision.model_dump(), "executed": executed}
 
 
@@ -106,7 +125,7 @@ def get_invoice(invoice_id: int, user: UserDep, store: StoreDep) -> Invoice:
     return invoice
 
 
-def _payment_view(request: PaymentRecord, store: Store, gateway: Gateway) -> PaymentRequestView:
+def _payment_view(request: PaymentRecord, store: Store) -> PaymentRequestView:
     account = store.bank_account(request.bank_account_id, request.company_id)
     if account is None:
         raise _not_found("bank account")
@@ -116,10 +135,10 @@ def _payment_view(request: PaymentRecord, store: Store, gateway: Gateway) -> Pay
         account=_account_view(store, account),
         created_by=store.users[request.creator_id],
         risk=store.risk.get(request.id),
-        gateway=_decide(gateway, request, store),
+        approval=_approval_state(store, request),
         approvals=[
-            ApprovalView(approver=store.users[r.approver_id], approved=r.approve, signed_at=r.signed_at)
-            for r in gateway.approvals(request.id)
+            ApprovalView(approver=store.users[e.approver_id], approved=e.approve, at=e.at)
+            for e in store.approvals.get(request.id, [])
         ],
     )
 
@@ -134,11 +153,11 @@ def get_payment_info(request_id: int, store: StoreDep) -> PaymentRequestInfo:
 
 
 @router.get("/payment-requests/{request_id}")
-def get_payment_request(request_id: int, user: UserDep, store: StoreDep, gateway: GatewayDep) -> PaymentRequestView:
+def get_payment_request(request_id: int, user: UserDep, store: StoreDep) -> PaymentRequestView:
     request = store.payment_request(request_id, user.company_id)
     if request is None:
         raise _not_found("payment request")
-    return _payment_view(request, store, gateway)
+    return _payment_view(request, store)
 
 
 @router.post("/payment-requests/{request_id}/approvals", status_code=status.HTTP_201_CREATED)
@@ -149,27 +168,53 @@ def decide_payment_request(
     if request is None:
         raise _not_found("payment request")
     if user.role not in APPROVER_ROLES:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "your role cannot approve payments")
+        raise HTTPException(status.HTTP_403_FORBIDDEN, ["your role cannot approve payments"])
     if request.status != InvoiceStatus.PENDING_APPROVAL:
-        raise HTTPException(status.HTTP_409_CONFLICT, "request is not awaiting approval")
-    # The bank account must still be verified: an approval signs this exact account.
-    account = store.bank_account(request.bank_account_id, user.company_id)
-    if account is None or account.status != BankAccountStatus.VERIFIED:
-        raise HTTPException(status.HTTP_409_CONFLICT, "bank account is not verified")
+        raise HTTPException(status.HTTP_409_CONFLICT, ["request is not awaiting approval"])
+    _verified_account(store, request)
 
+    # Role and company come from the session, never from the request body.
+    approval = ApprovalRequest(payment_request_id=request.id, approver_id=user.id, approve=body.approved,
+                               comment=body.comment, approver_role=user.role, company_id=user.company_id)
     try:
-        gateway.record(request, account, user, body.approved)
+        result = gateway.submit_approval(approval)
     except ApprovalRefused as refused:
-        code = status.HTTP_403_FORBIDDEN if refused.code == "SELF_APPROVAL" else status.HTTP_409_CONFLICT
-        raise HTTPException(code, refused.code) from None
-    except Exception:
-        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "gateway unavailable; nothing was recorded") from None
+        raise HTTPException(refused.status_code, refused.reasons) from None
+    except GatewayUnavailable:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, ["gateway unavailable: nothing was approved"]) from None
 
-    # Enough approvals keeps the status at PENDING_APPROVAL: the gateway's execute-check
-    # only allows a payment in that status, and execution then sets PAID_SIMULATED.
-    if "REJECTED_BY_APPROVER" in _decide(gateway, request, store).reasons:
+    store.record_approval(user.id, body.approved, result)
+    # APPROVED keeps PENDING_APPROVAL: execute-check only allows a payment in that status.
+    if result.status == ApprovalStatus.REJECTED:
         store.set_request_status(request.id, InvoiceStatus.REJECTED)
-    return _payment_view(store.payment_requests[request.id], store, gateway)
+    return _payment_view(store.payment_requests[request.id], store)
+
+
+@router.post("/payment-requests/{request_id}/execute")
+def execute_payment_request(request_id: int, user: UserDep, store: StoreDep, gateway: GatewayDep) -> ExecutionView:
+    """Simulated payment. Runs only when the gateway's execute-check says allowed, right before paying."""
+    request = store.payment_request(request_id, user.company_id)
+    if request is None:
+        raise _not_found("payment request")
+    if user.role not in EXECUTOR_ROLES:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, ["your role cannot execute payments"])
+    if request.status != InvoiceStatus.PENDING_APPROVAL:
+        raise HTTPException(status.HTTP_409_CONFLICT, [f"request is {request.status.value}, not awaiting execution"])
+    account = _verified_account(store, request)
+
+    check = ExecuteCheckRequest(payment_request_id=request.id, requested_by=user.id, company_id=user.company_id)
+    try:
+        result = gateway.execute_check(check)
+    except ApprovalRefused as refused:
+        raise HTTPException(refused.status_code, refused.reasons) from None
+    except GatewayUnavailable:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, ["gateway unavailable: nothing was paid"]) from None
+    if not result.allowed:
+        raise HTTPException(status.HTTP_409_CONFLICT, result.reasons or ["gateway did not allow execution"])
+
+    store.set_request_status(request.id, InvoiceStatus.PAID_SIMULATED)
+    store.times_paid[account.id] = store.times_paid.get(account.id, 0) + 1
+    return ExecutionView(request=store.payment_requests[request.id], executed=True)
 
 
 @router.get("/vendors/{vendor_id}/bank-change")

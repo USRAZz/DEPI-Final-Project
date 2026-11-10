@@ -12,6 +12,7 @@ from decimal import Decimal
 from typing import TypeVar
 
 from securefin_contracts import (
+    ApprovalResult,
     BankAccount,
     BankAccountStatus,
     Company,
@@ -44,6 +45,13 @@ def _at(iso: str) -> datetime:
     return datetime.fromisoformat(iso).replace(tzinfo=UTC)
 
 
+@dataclass(frozen=True)
+class ApprovalEntry:
+    approver_id: int
+    approve: bool
+    at: datetime
+
+
 @dataclass
 class Store:
     companies: dict[int, Company] = field(default_factory=dict)
@@ -55,6 +63,9 @@ class Store:
     payment_requests: dict[int, PaymentRecord] = field(default_factory=dict)
     risk: dict[int, RiskScore] = field(default_factory=dict)
     bank_change_requested_by: dict[int, int] = field(default_factory=dict)
+    # What the gateway answered, kept for the screens: the gateway has no read endpoint for approvals.
+    approvals: dict[int, list[ApprovalEntry]] = field(default_factory=dict)
+    approval_results: dict[int, ApprovalResult] = field(default_factory=dict)
 
     # -- reads, always scoped to one company ---------------------------------
 
@@ -96,6 +107,11 @@ class Store:
 
     def set_request_status(self, request_id: int, status: InvoiceStatus) -> None:
         self.payment_requests[request_id] = self.payment_requests[request_id].model_copy(update={"status": status})
+
+    def record_approval(self, approver_id: int, approve: bool, result: ApprovalResult) -> None:
+        self.approvals.setdefault(result.payment_request_id, []).append(
+            ApprovalEntry(approver_id=approver_id, approve=approve, at=datetime.now(UTC)))
+        self.approval_results[result.payment_request_id] = result
 
 
 def seeded_store() -> Store:

@@ -5,8 +5,8 @@ These are views, not new shared shapes, so they live here and not in contracts/.
 
 from datetime import datetime
 
-from pydantic import BaseModel
-from securefin_contracts import BankAccount, GatewayDecision, Money, RiskScore, User, Vendor
+from pydantic import BaseModel, ConfigDict, Field
+from securefin_contracts import ApprovalStatus, BankAccount, Money, RiskScore, User, Vendor
 
 from .models import PaymentRecord
 
@@ -35,7 +35,16 @@ class DashboardView(BaseModel):
 class ApprovalView(BaseModel):
     approver: User
     approved: bool
-    signed_at: datetime
+    at: datetime
+
+
+class ApprovalState(BaseModel):
+    """The gateway's latest answer for this request. Before the first approval, required is the api's estimate."""
+
+    status: ApprovalStatus
+    approvals_received: int
+    approvals_required: int
+    reasons: list[str] = Field(default_factory=list)
 
 
 class PaymentRequestView(BaseModel):
@@ -44,7 +53,7 @@ class PaymentRequestView(BaseModel):
     account: AccountView
     created_by: User
     risk: RiskScore | None
-    gateway: GatewayDecision
+    approval: ApprovalState
     approvals: list[ApprovalView]
 
 
@@ -56,4 +65,14 @@ class BankChangeView(BaseModel):
 
 
 class ApprovalIn(BaseModel):
+    # Role and company come from the session, never from the body.
+    model_config = ConfigDict(extra="forbid")
+
     approved: bool
+    comment: str = Field(default="", max_length=500)
+
+
+class ExecutionView(BaseModel):
+    request: PaymentRecord
+    executed: bool
+    reasons: list[str] = Field(default_factory=list)
