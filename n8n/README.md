@@ -3,15 +3,30 @@
 n8n notifies and reports. It never decides allow / hold / block, never writes approvals and has no database
 access. If n8n is down, payments are still held or blocked correctly; only messages and the nightly report stop.
 
-| File in `workflows/` | What it does | Needs from other services |
+## Standalone now, connected later
+
+The other services are not finished, so every workflow runs on its own today. Nothing in the JSON changes when
+you connect one: you fill in its URL in `.env` and restart n8n.
+
+| File in `workflows/` | Standalone (URL empty, the default) | Connected (set in `.env`) |
 |---|---|---|
-| `0-error-alerts.json` | Any failed run in the other three → Telegram, email if Telegram fails | nothing |
-| `1-invoice-email-intake.json` | Invoice inbox → `POST /v1/invoices/upload` on the api | upload endpoint (Karim), not built yet |
-| `2-decision-notifications.json` | Signed gateway event → Arabic + English Telegram message with a link to the app | gateway must send the event (Anan), not built yet |
-| `3-nightly-integrity-run.json` | 02:00 and on demand: audit hash chain check + attack suite scorecard | `POST /v1/audit/verify` (branch `feat/gateway/db-store-audit`); attack runner not built yet |
+| `0-error-alerts.json` | Any failed run in the other three → Telegram, email if Telegram fails | same, no service needed |
+| `1-invoice-email-intake.json` | Invoice email → Telegram "new invoice received" with the sender and the file hash; the same file is announced once. Nothing is stored | `N8N_INVOICE_UPLOAD_URL` + `N8N_INTAKE_TOKEN`: uploads to the api (Karim's endpoint, not built yet) |
+| `2-decision-notifications.json` | Send events yourself with `n8n/tools/send_event.py` → Arabic + English Telegram message | the gateway posts the same signed event (Anan, not built yet); no setting changes in n8n |
+| `3-nightly-integrity-run.json` | Runs on **simulated** answers; every report starts with "DEMO MODE: simulated data, nothing real was checked" | `N8N_AUDIT_VERIFY_URL` + `AUDIT_VERIFY_TOKEN` (endpoint on branch `feat/gateway/db-store-audit`); `N8N_ATTACK_RUN_URL` when the attack runner exists |
+
+Standalone integrity demo (the alert arrives on Telegram through workflow 0):
+
+```bash
+curl -X POST -H "X-Run-Token: <token>" -H "Content-Type: application/json" -d '{"simulate": "broken_chain"}' http://localhost:5678/webhook/securefin/integrity-run
+```
+
+`simulate` can be `broken_chain`, `deleted_rows` or `attack_miss`; leave it out for an all-good run. In standalone
+mode the outside heartbeat is not pinged, and simulated entry counts are kept apart from real ones.
 
 Tested on `n8nio/n8n:2.46.7` against mock services: all four import, publish and run. Not tested against
 a real mailbox (the IMAP trigger was replaced by a webhook in the test), real Telegram, or real SMTP.
+Both modes were tested: standalone with no service URL set, connected against the mocks.
 
 ## Set up
 
@@ -32,17 +47,17 @@ a real mailbox (the IMAP trigger was replaced by a webhook in the test), real Te
 4. Workflows (repeat after every change to the JSON; importing un-publishes, so publish again):
 
    ```bash
-   docker compose exec n8n sh -c 'n8n import:workflow --separate --input=/workflows && for w in sfErrorAlerts0001 sfDecisionNotify01 sfIntegrityRun001; do n8n publish:workflow --id=$w; done'
+   docker compose exec n8n sh -c 'n8n import:workflow --separate --input=/workflows && for w in sfErrorAlerts0001 sfInvoiceIntake001 sfDecisionNotify01 sfIntegrityRun001; do n8n publish:workflow --id=$w; done'
    docker compose restart n8n
    ```
 
-   Add `sfInvoiceIntake001` to the list once the upload endpoint exists; before that every email ends in an alert.
+   The intake workflow needs the IMAP credential from step 3 before it is published.
 5. Check: `python n8n/tools/send_event.py hold --payment 1 --reason TEST` (with `N8N_WEBHOOK_HMAC_SECRET` set in
    your shell) should answer `202` and a Telegram message should arrive.
 
 Edit workflows in the editor, then export them back: `n8n export:workflow --id=<id> --output=/tmp/x.json`.
 
-## Contracts
+## Contracts (for connecting later)
 
 ### 1. Upload (api, Karim)
 

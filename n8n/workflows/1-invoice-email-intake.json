@@ -141,13 +141,130 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        1100,
+        1320,
         0
       ],
       "retryOnFail": true,
       "maxTries": 3,
       "waitBetweenTries": 5000,
       "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $env.N8N_INVOICE_UPLOAD_URL }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "a9",
+      "name": "API connected?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "removeItemsSeenInPreviousExecutions",
+        "logic": "removeItemsWithAlreadySeenKeyValues",
+        "dedupeValue": "={{ $json.sha256 }}",
+        "options": {
+          "scope": "node",
+          "historySize": 10000
+        }
+      },
+      "id": "a10",
+      "name": "Skip files already seen",
+      "type": "n8n-nodes-base.removeDuplicates",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Standalone mode (N8N_INVOICE_UPLOAD_URL is empty): the api is not connected yet, so the invoice is only\n// announced. Nothing is stored anywhere; the file stays in the mailbox.\nconst html = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\nreturn $input.all().map((item, i) => {\n  const j = item.json;\n  const plain = ['فاتورة جديدة وصلت بالبريد', 'New invoice received by email', '',\n    `From / من: ${String(j.sender || 'unknown').slice(0, 120)}`,\n    `File / الملف: ${j.sha256}.${j.ext}`, '',\n    'Standalone mode: not sent to the API yet / وضع مستقل: لم تُرسل إلى النظام بعد'].join('\\n');\n  return { json: { subject: 'SecureFin: new invoice received (standalone mode)', plain, text: html(plain) }, pairedItem: i };\n});"
+      },
+      "id": "a11",
+      "name": "Build received message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1540,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $env.TELEGRAM_CHAT_ID }}",
+        "text": "={{ $json.text }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML",
+          "disable_web_page_preview": true
+        }
+      },
+      "id": "a12",
+      "name": "Tell the team",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1760,
+        260
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "sfTelegramAlerts01",
+          "name": "SecureFin alerts bot (Telegram)"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 2000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{ $env.ALERT_EMAIL_FROM }}",
+        "toEmail": "={{ $env.ALERT_EMAIL_TO }}",
+        "subject": "={{ $('Build received message').item.json.subject }}",
+        "emailFormat": "text",
+        "text": "={{ $('Build received message').item.json.plain }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "a13",
+      "name": "Email fallback",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1980,
+        360
+      ],
+      "credentials": {
+        "smtp": {
+          "id": "sfAlertsSmtp00001",
+          "name": "SecureFin alerts (SMTP)"
+        }
+      }
     },
     {
       "parameters": {
@@ -225,7 +342,59 @@
       "main": [
         [
           {
+            "node": "API connected?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "API connected?": {
+      "main": [
+        [
+          {
             "node": "Upload to API",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Skip files already seen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Skip files already seen": {
+      "main": [
+        [
+          {
+            "node": "Build received message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build received message": {
+      "main": [
+        [
+          {
+            "node": "Tell the team",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tell the team": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Email fallback",
             "type": "main",
             "index": 0
           }

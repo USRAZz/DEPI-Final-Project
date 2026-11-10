@@ -61,6 +61,49 @@
     },
     {
       "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $env.N8N_AUDIT_VERIFY_URL }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "c16",
+      "name": "Gateway connected?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        330,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Standalone mode (N8N_AUDIT_VERIFY_URL is empty): the gateway is not connected yet. This node answers in the\n// gateway's format with SIMULATED data so the rest of the workflow can be shown. Nothing real is checked and\n// the scorecard says so. For the demo, call the \"Run now\" webhook with {\"simulate\": \"...\"}:\n//   broken_chain | deleted_rows | attack_miss   (anything else = all good)\nconst body = $('Run now (demo)').isExecuted ? ($('Run now (demo)').first().json.body ?? {}) : {};\nconst simulate = ['broken_chain', 'deleted_rows', 'attack_miss'].includes(body.simulate) ? body.simulate : 'none';\nreturn $input.all().map((item, i) => ({\n  json: {\n    simulate,\n    statusCode: 200,\n    body: {\n      ok: simulate !== 'broken_chain',\n      company_id: item.json.company_id,\n      entries: simulate === 'deleted_rows' ? 5 : 12,\n      first_broken_index: simulate === 'broken_chain' ? 6 : null,\n      first_broken_id: simulate === 'broken_chain' ? 7 : null,\n      head_hash: null,\n    },\n  },\n  pairedItem: i,\n}));"
+      },
+      "id": "c17",
+      "name": "Demo audit verdict",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        160
+      ]
+    },
+    {
+      "parameters": {
         "method": "POST",
         "url": "={{ $env.N8N_AUDIT_VERIFY_URL }}",
         "sendHeaders": true,
@@ -176,7 +219,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Builds the scorecard. n8n decides nothing about payments here; it only reports what the services answered.\nconst audit = $('Audit verdicts').first().json.audit;\nconst state = $getWorkflowStaticData('global');\nstate.entries = state.entries ?? {};\n// A hash chain proves rows were not edited; it cannot show that the newest rows were deleted. The entry\n// count from the last good run can: it must never go down.\nfor (const a of audit) {\n  const before = state.entries[a.company_id];\n  if (a.ok && Number.isInteger(before) && a.entries < before) {\n    a.ok = false;\n    a.detail = `audit log shrank from ${before} to ${a.entries} entries (rows deleted)`;\n  }\n}\nlet attack = { status: 'not_configured', detail: 'attack suite not configured (N8N_ATTACK_RUN_URL is empty): NOT checked' };\nif ($('Run attack suite').isExecuted) {\n  const r = $('Run attack suite').first().json;\n  const b = r.body ?? {};\n  const min = Number($env.N8N_ATTACK_MIN_CASES ?? 1);\n  const counted = [b.total, b.blocked].every(Number.isInteger) && Array.isArray(b.missed);\n  if (r.statusCode !== 200 || !counted) {\n    const why = r.error ? String(r.error.message ?? r.error).slice(0, 120) : `HTTP ${r.statusCode ?? 'none'}`;\n    attack = { status: 'fail', detail: `attack suite gave no scorecard (${why})` };\n  } else if (b.total < min || b.blocked + b.missed.length !== b.total) {\n    attack = { status: 'fail', detail: `attack suite ran ${b.total} case(s), expected at least ${min} and blocked + missed = total` };\n  } else if (b.missed.length) {\n    attack = { status: 'fail', detail: `${b.blocked}/${b.total} blocked, got through: ${b.missed.slice(0, 10).map(String).join(', ')}` };\n  } else {\n    attack = { status: 'pass', detail: `${b.blocked}/${b.total} blocked` };\n  }\n}\nconst ok = audit.every((a) => a.ok) && attack.status !== 'fail';\nconst now = new Date().toISOString();\nif (ok) {\n  state.last_ok = now;\n  for (const a of audit) state.entries[a.company_id] = a.entries;\n}\nconst summary = [\n  ok ? 'Integrity run: OK' : 'Integrity run: FAILED',\n  ...audit.map((a) => `audit company ${a.company_id}: ${a.ok ? 'OK' : 'FAIL'} - ${a.detail}`),\n  `attacks: ${attack.detail}`,\n].join('\\n');\nreturn [{ json: { ok, checked_at: now, audit, attack, summary } }];"
+        "jsCode": "// Builds the scorecard. n8n decides nothing about payments here; it only reports what the services answered.\nconst audit = $('Audit verdicts').first().json.audit;\nconst state = $getWorkflowStaticData('global');\n// demo = standalone mode: the audit answers were simulated by \"Demo audit verdict\" (null when the gateway is connected).\nconst demo = $('Demo audit verdict').isExecuted ? $('Demo audit verdict').first().json.simulate : null;\nconst counts = demo === null ? 'entries' : 'entries_demo';  // simulated counts never mix with real ones\nstate[counts] = state[counts] ?? {};\n// A hash chain proves rows were not edited; it cannot show that the newest rows were deleted. The entry\n// count from the last good run can: it must never go down.\nfor (const a of audit) {\n  const before = state[counts][a.company_id];\n  if (a.ok && Number.isInteger(before) && a.entries < before) {\n    a.ok = false;\n    a.detail = `audit log shrank from ${before} to ${a.entries} entries (rows deleted)`;\n  }\n}\nlet attack = { status: 'not_configured', detail: 'attack suite not configured (N8N_ATTACK_RUN_URL is empty): NOT checked' };\nif ($('Run attack suite').isExecuted) {\n  const r = $('Run attack suite').first().json;\n  const b = r.body ?? {};\n  const min = Number($env.N8N_ATTACK_MIN_CASES ?? 1);\n  const counted = [b.total, b.blocked].every(Number.isInteger) && Array.isArray(b.missed);\n  if (r.statusCode !== 200 || !counted) {\n    const why = r.error ? String(r.error.message ?? r.error).slice(0, 120) : `HTTP ${r.statusCode ?? 'none'}`;\n    attack = { status: 'fail', detail: `attack suite gave no scorecard (${why})` };\n  } else if (b.total < min || b.blocked + b.missed.length !== b.total) {\n    attack = { status: 'fail', detail: `attack suite ran ${b.total} case(s), expected at least ${min} and blocked + missed = total` };\n  } else if (b.missed.length) {\n    attack = { status: 'fail', detail: `${b.blocked}/${b.total} blocked, got through: ${b.missed.slice(0, 10).map(String).join(', ')}` };\n  } else {\n    attack = { status: 'pass', detail: `${b.blocked}/${b.total} blocked` };\n  }\n} else if (demo !== null) {\n  attack = demo === 'attack_miss'\n    ? { status: 'fail', detail: '19/22 blocked, got through: ATK-004, ATK-011, ATK-019 (simulated)' }\n    : { status: 'pass', detail: '22/22 blocked (simulated)' };\n}\nconst ok = audit.every((a) => a.ok) && attack.status !== 'fail';\nconst now = new Date().toISOString();\nif (ok) {\n  state.last_ok = now;\n  for (const a of audit) state[counts][a.company_id] = a.entries;\n}\nconst summary = [\n  ...(demo !== null ? ['DEMO MODE: simulated data, nothing real was checked'] : []),\n  ok ? 'Integrity run: OK' : 'Integrity run: FAILED',\n  ...audit.map((a) => `audit company ${a.company_id}: ${a.ok ? 'OK' : 'FAIL'} - ${a.detail}`),\n  `attacks: ${attack.detail}`,\n].join('\\n');\nreturn [{ json: { ok, demo: demo !== null, checked_at: now, audit, attack, summary } }];"
       },
       "id": "c8",
       "name": "Scorecard",
@@ -220,7 +263,7 @@
     {
       "parameters": {
         "method": "GET",
-        "url": "={{ $env.N8N_HEARTBEAT_URL || 'http://localhost:5678/healthz' }}",
+        "url": "={{ (!$json.demo && $env.N8N_HEARTBEAT_URL) || 'http://localhost:5678/healthz' }}",
         "options": {
           "timeout": 10000
         }
@@ -335,7 +378,36 @@
       "main": [
         [
           {
+            "node": "Gateway connected?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gateway connected?": {
+      "main": [
+        [
+          {
             "node": "Verify audit chain",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Demo audit verdict",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Demo audit verdict": {
+      "main": [
+        [
+          {
+            "node": "Audit verdicts",
             "type": "main",
             "index": 0
           }

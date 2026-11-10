@@ -40,8 +40,9 @@ services:
       NODES_EXCLUDE: '["n8n-nodes-base.executeCommand","n8n-nodes-base.ssh","n8n-nodes-base.localFileTrigger","n8n-nodes-base.readWriteFile","n8n-nodes-base.postgres"]'
       EXECUTIONS_DATA_PRUNE: "true"
       EXECUTIONS_DATA_MAX_AGE: "168"  # hours; execution logs can hold invoice files
+      # Standalone until the services exist: an empty URL makes that workflow run on its own (n8n/README.md).
       # 1 invoice email intake
-      N8N_INVOICE_UPLOAD_URL: ${N8N_INVOICE_UPLOAD_URL:-http://api:8000/v1/invoices/upload}
+      N8N_INVOICE_UPLOAD_URL: ${N8N_INVOICE_UPLOAD_URL:-}
       N8N_INTAKE_TOKEN: ${N8N_INTAKE_TOKEN:-}
       N8N_COMPANY_ID: ${N8N_COMPANY_ID:-1}
       # 2 decision notifications
@@ -51,7 +52,7 @@ services:
       ALERT_EMAIL_FROM: ${ALERT_EMAIL_FROM:-}
       ALERT_EMAIL_TO: ${ALERT_EMAIL_TO:-}
       # 3 nightly integrity run
-      N8N_AUDIT_VERIFY_URL: ${N8N_AUDIT_VERIFY_URL:-http://gateway:8000/v1/audit/verify}
+      N8N_AUDIT_VERIFY_URL: ${N8N_AUDIT_VERIFY_URL:-}
       N8N_GATEWAY_TOKEN: ${AUDIT_VERIFY_TOKEN:-}
       N8N_AUDIT_COMPANY_IDS: ${N8N_AUDIT_COMPANY_IDS:-1}
       N8N_ATTACK_RUN_URL: ${N8N_ATTACK_RUN_URL:-}
