@@ -1,3 +1,5 @@
+from datetime import UTC, datetime, timedelta
+
 import pytest
 from app.main import app as default_app
 from app.main import create_app
@@ -18,7 +20,7 @@ from app.store import (
     seeded_store,
 )
 from fastapi.testclient import TestClient
-from securefin_contracts import ApprovalRequest, BankAccountStatus, ExecuteCheckRequest
+from securefin_contracts import ApprovalRequest, ApprovalResult, BankAccountStatus, ExecuteCheckRequest
 from tests.fakes import DownGateway, FakeGateway
 
 
@@ -127,13 +129,26 @@ class TestApprovals:
     def test_same_approver_cannot_approve_twice(self, client):
         approve(client, PR_187, MONA)
         res = approve(client, PR_187, MONA)
-        assert res.status_code == 409 and res.json()["detail"] == ["this approver has already decided"]
+        assert res.status_code == 403
+        assert res.json()["detail"] == ["this approver has already decided on this payment request"]
 
     def test_one_rejection_rejects_the_request(self, client):
         body = approve(client, PR_187, MONA, approved=False).json()
         assert body["approval"]["status"] == "REJECTED"
         assert body["request"]["status"] == "REJECTED"
         assert approve(client, PR_187, KARIM).status_code == 409
+
+    def test_expired_answer_is_shown_but_not_listed_as_an_approval(self, client, gateway):
+        def expired(req):
+            gateway.sent.append(req)
+            return ApprovalResult(payment_request_id=req.payment_request_id, status="EXPIRED", approvals_received=0,
+                                  approvals_required=1, reasons=["approval window has expired"])
+
+        gateway.submit_approval = expired
+        body = approve(client, PR_189, MONA).json()
+        assert body["approval"]["status"] == "EXPIRED"
+        assert body["approval"]["reasons"] == ["approval window has expired"]
+        assert body["approvals"] == []
 
     def test_cannot_approve_payment_to_unverified_account(self, client, store, gateway):
         account_id = store.payment_requests[PR_188].bank_account_id
@@ -210,14 +225,18 @@ class TestPaymentInfoForGateway:
     def service_token(self, monkeypatch):
         monkeypatch.setenv("INTERNAL_SERVICE_TOKEN", "test-service-token")
 
-    def test_returns_payment_request_info(self, client):
+    def test_returns_payment_request_info(self, client, store):
         res = client.get(f"/payments/{PR_187}", headers={"X-Service-Token": "test-service-token"})
         assert res.status_code == 200
+        created_at = store.payment_requests[PR_187].created_at.isoformat().replace("+00:00", "Z")
         assert res.json() == {
             "id": PR_187, "company_id": 1, "creator_id": SARA, "invoice_id": INV_0412, "vendor_id": 1,
-            "amount": "15400.00", "currency": "EGP", "status": "PENDING_APPROVAL",
-            "created_at": "2026-11-02T10:00:00Z",
+            "amount": "15400.00", "currency": "EGP", "status": "PENDING_APPROVAL", "created_at": created_at,
         }
+
+    def test_sample_requests_are_inside_the_gateways_72_hour_window(self, store):
+        now = datetime.now(UTC)
+        assert all(now - p.created_at < timedelta(hours=72) for p in store.payment_requests.values())
 
     def test_unknown_payment_is_404(self, client):
         assert client.get("/payments/9999", headers={"X-Service-Token": "test-service-token"}).status_code == 404

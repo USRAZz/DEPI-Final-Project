@@ -53,7 +53,7 @@ class FakeGateway:
             raise ApprovalRefused(403, [f"payment request is {payment.status.value}, not awaiting approval"])
         existing = self.decisions.setdefault(req.payment_request_id, [])
         if any(d.approver_id == req.approver_id for d in existing):
-            raise ApprovalRefused(409, ["this approver has already decided"])
+            raise ApprovalRefused(403, ["this approver has already decided on this payment request"])
 
         existing.append(req)
         required = self._required(payment.amount, payment.currency)

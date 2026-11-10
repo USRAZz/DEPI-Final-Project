@@ -7,12 +7,13 @@ takes the caller's company_id: a record from another company is "not found", nev
 """
 
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import TypeVar
 
 from securefin_contracts import (
     ApprovalResult,
+    ApprovalStatus,
     BankAccount,
     BankAccountStatus,
     Company,
@@ -109,8 +110,10 @@ class Store:
         self.payment_requests[request_id] = self.payment_requests[request_id].model_copy(update={"status": status})
 
     def record_approval(self, approver_id: int, approve: bool, result: ApprovalResult) -> None:
-        self.approvals.setdefault(result.payment_request_id, []).append(
-            ApprovalEntry(approver_id=approver_id, approve=approve, at=datetime.now(UTC)))
+        # On EXPIRED the gateway stores nothing, so the screens must not list this approval either.
+        if result.status != ApprovalStatus.EXPIRED:
+            self.approvals.setdefault(result.payment_request_id, []).append(
+                ApprovalEntry(approver_id=approver_id, approve=approve, at=datetime.now(UTC)))
         self.approval_results[result.payment_request_id] = result
 
 
@@ -162,17 +165,21 @@ def seeded_store() -> Store:
         ),
     )
 
-    def add_request(rid: int, vendor: int, account: int, invoice: int, amount: str, by: int, at: str) -> None:
+    # Dated relative to start-up: the gateway voids approvals on a request older than its expiry
+    # window (72 h by default), so fixed dates would make every sample request expired.
+    now = datetime.now(UTC).replace(microsecond=0)
+
+    def add_request(rid: int, vendor: int, account: int, invoice: int, amount: str, by: int, hours_ago: int) -> None:
         s.payment_requests[rid] = PaymentRecord(
             id=rid, company_id=DELTA, vendor_id=vendor, bank_account_id=account, invoice_id=invoice,
             amount=Decimal(amount), currency="EGP", status=InvoiceStatus.PENDING_APPROVAL,
-            creator_id=by, created_at=_at(at),
+            creator_id=by, created_at=now - timedelta(hours=hours_ago),
         )
 
-    add_request(PR_187, NILE, ACC_NILE, INV_0412, "15400.00", SARA, "2026-11-02T10:00:00")
-    add_request(PR_188, EGPACK, ACC_EGPACK_OLD, 415, "8750.00", SARA, "2026-11-02T11:30:00")
-    add_request(PR_189, CAIRONET, ACC_CAIRONET, 416, "2300.00", OMAR, "2026-11-03T08:05:00")
-    add_request(PR_190, AMAL, ACC_AMAL, 417, "12000.00", KARIM, "2026-11-03T08:40:00")
+    add_request(PR_187, NILE, ACC_NILE, INV_0412, "15400.00", SARA, hours_ago=6)
+    add_request(PR_188, EGPACK, ACC_EGPACK_OLD, 415, "8750.00", SARA, hours_ago=5)
+    add_request(PR_189, CAIRONET, ACC_CAIRONET, 416, "2300.00", OMAR, hours_ago=3)
+    add_request(PR_190, AMAL, ACC_AMAL, 417, "12000.00", KARIM, hours_ago=2)
 
     s.risk[PR_187] = RiskScore(
         score=72, level=RiskLevel.HIGH, model_version="rules-0.1",
