@@ -5,6 +5,7 @@ from pydantic import ValidationError
 from securefin_contracts import (
     ApprovalRequest,
     ApprovalResult,
+    AuditEvent,
     AuthorizeRequest,
     Decision,
     ExecuteCheckRequest,
@@ -15,18 +16,34 @@ from securefin_contracts import (
 from securefin_contracts.actions import CreatePaymentParams
 
 from .approvals import ApprovalDenied, ApprovalKeyError, execute_check, load_hmac_key, submit_approval
-from .audit_chain import compute_hash  # noqa: F401  (used by the real audit endpoint)
+from .audit_log import InMemoryAuditLog, PostgresAuditLog
+from .db import build_engine
 from .payments_client import PaymentNotFoundError, PaymentsUnavailableError, build_payments_client
 from .policy import BASE_CURRENCY, get_policy
 from .risk_client import RiskUnavailableError, build_risk_client
-from .stores import DuplicateApprovalError, InMemoryApprovalStore
+from .stores import DuplicateApprovalError, InMemoryApprovalStore, PostgresApprovalStore
 
 app = FastAPI(title="SecureFin Security Gateway")
 
 POLICY = get_policy()  # fails at start-up if policies/ is missing or invalid (fail closed)
 RISK_CLIENT = build_risk_client(POLICY.defaults.gateway.timeout_ms)
 PAYMENTS_CLIENT = build_payments_client(POLICY.defaults.gateway.timeout_ms)
-APPROVAL_STORE = InMemoryApprovalStore()  # TODO: database-backed store once the approvals table exists
+# DATABASE_URL set -> the approvals and audit_log tables (migration 0001); otherwise in memory (local runs, tests).
+ENGINE = build_engine()
+APPROVAL_STORE = (PostgresApprovalStore(ENGINE, POLICY.defaults.approvals.approval_expiry_hours) if ENGINE
+                  else InMemoryApprovalStore())
+AUDIT_LOG = PostgresAuditLog(ENGINE) if ENGINE else InMemoryAuditLog()
+
+
+def _audit(action: str, company_id: int | None, user_id: int | None, decision: str, result: str,
+           parameters: dict) -> None:
+    """Every approval / execute-check outcome is recorded (issue #16). Without a company there is no tenant
+    chain to append to, and the request is refused anyway (approver company is required)."""
+    if company_id is None:
+        return
+    AUDIT_LOG.append(AuditEvent(user_id=user_id, company_id=company_id, action=action, decision=decision,
+                                result=result[:500], parameters=parameters, source_service="gateway",
+                                tool_call=action))
 
 
 @app.get("/health")
@@ -92,18 +109,32 @@ def _signing_key() -> bytes:
 
 @app.post("/v1/approvals/{payment_request_id}", response_model=ApprovalResult)
 def approve(payment_request_id: int, req: ApprovalRequest) -> ApprovalResult:
+    params = {"payment_request_id": payment_request_id, "approve": req.approve}
+    try:
+        result = _approve(payment_request_id, req)
+    except HTTPException as e:
+        _audit("approval", req.company_id, req.approver_id, "BLOCK", f"{e.status_code}: {'; '.join(e.detail)}", params)
+        raise
+    # shortcut: the approval row and its audit entry are two transactions; an audit failure after a stored
+    # approval returns 500 and leaves the approval without an entry. One shared transaction fixes it.
+    _audit("approval", req.company_id, req.approver_id, result.status.value,
+           "; ".join(result.reasons) or f"{result.approvals_received}/{result.approvals_required} approvals", params)
+    return result
+
+
+def _approve(payment_request_id: int, req: ApprovalRequest) -> ApprovalResult:
     if req.payment_request_id != payment_request_id:
         raise HTTPException(status_code=422, detail=["payment request id in path and body differ"])
     key = _signing_key()
     payment = _load_payment(payment_request_id)
+    existing = APPROVAL_STORE.list(payment_request_id, company_id=payment.company_id)
     try:
-        result, record = submit_approval(req, payment, APPROVAL_STORE.list(payment_request_id), POLICY, key,
-                                         datetime.now(UTC))
+        result, record = submit_approval(req, payment, existing, POLICY, key, datetime.now(UTC))
     except ApprovalDenied as e:
         raise HTTPException(status_code=403, detail=e.reasons) from None
     if record is not None:
         try:
-            APPROVAL_STORE.add(record)
+            APPROVAL_STORE.add(record, company_id=payment.company_id)
         except DuplicateApprovalError:
             raise HTTPException(status_code=409, detail=["this approver has already decided"]) from None
     return result
@@ -112,7 +143,16 @@ def approve(payment_request_id: int, req: ApprovalRequest) -> ApprovalResult:
 @app.post("/v1/execute-check", response_model=ExecuteCheckResult)
 def execute_check_endpoint(req: ExecuteCheckRequest) -> ExecuteCheckResult:
     """The api calls this right before executing a payment. Anything but allowed=true means do not pay."""
-    key = _signing_key()
-    payment = _load_payment(req.payment_request_id)
-    return execute_check(req, payment, APPROVAL_STORE.list(req.payment_request_id), POLICY, key,
-                         datetime.now(UTC))
+    params = {"payment_request_id": req.payment_request_id}
+    try:
+        key = _signing_key()
+        payment = _load_payment(req.payment_request_id)
+    except HTTPException as e:
+        _audit("execute_check", req.company_id, req.requested_by, "BLOCK", f"{e.status_code}: {'; '.join(e.detail)}",
+               params)
+        raise
+    result = execute_check(req, payment, APPROVAL_STORE.list(req.payment_request_id, company_id=payment.company_id),
+                           POLICY, key, datetime.now(UTC))
+    _audit("execute_check", req.company_id, req.requested_by, "ALLOW" if result.allowed else "BLOCK",
+           "; ".join(result.reasons) or "allowed", params)
+    return result

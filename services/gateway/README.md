@@ -70,3 +70,13 @@ The HTTP endpoints and the `approvals` table are added in the next PR.
 - The gateway reads the payment request from the api: `GET {API_URL}/payments/{id}` returning `PaymentRequestInfo`.
   `API_URL` defaults to `http://api:8000` (Docker); outside Docker use `http://localhost:8000`.
 - Approvals are kept in memory for now (lost on restart). The database-backed store follows once the `approvals` table migration exists.
+
+## Storage and audit (issues #15, #16)
+
+- `DATABASE_URL` set: approvals go to the `approvals` table and every approval / execute-check outcome (including
+  refusals and 403/404/503) is appended to `audit_log`, both through role `securefin_gateway` with `app.company_id`
+  set (row-level security). Without `DATABASE_URL` both live in memory (local runs, unit tests).
+- `audit_log` is one hash chain per company (`app/audit_log.py`); `verify(company_id)` returns the first broken
+  entry or None. Appends take a per-company advisory lock so two requests cannot fork the chain.
+- Known shortcut: an approval row and its audit entry are written in two transactions.
+- Tests: `tests/test_audit_log.py`; `tests/test_db_store_audit.py` needs `TEST_DATABASE_URL` (CI job `migrations-postgres`).
