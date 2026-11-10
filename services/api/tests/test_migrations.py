@@ -36,9 +36,9 @@ def engine():
     command.downgrade(cfg, "base")
 
 
-def _as_app(conn, company_id=None):
+def _as_app(conn, company_id=None, role="securefin_app"):
     from sqlalchemy import text
-    conn.execute(text("SET LOCAL ROLE securefin_app"))
+    conn.execute(text(f"SET LOCAL ROLE {role}"))
     if company_id is not None:
         conn.execute(text("SELECT set_config('app.company_id', :c, true)"), {"c": str(company_id)})
 
@@ -86,19 +86,62 @@ def test_same_file_twice_is_rejected_but_same_number_is_allowed(engine):
         c.execute(insert, {"k": "f3", "h": "b" * 64})
 
 
-def test_approvals_are_append_only_for_the_app(engine):
-    from sqlalchemy import exc, text
+APPROVAL = ("INSERT INTO approvals (company_id, payment_request_id, approver_id, approve, hmac_signature) "
+            "VALUES (1, :p, 2, true, 'sig')")
+
+
+@pytest.fixture(scope="module")
+def payment_request(engine):
+    from sqlalchemy import text
     with engine.begin() as c:
         _as_app(c, 1)
-        inv = c.execute(text("SELECT id FROM invoices LIMIT 1")).scalar()
-        pr = c.execute(text("INSERT INTO payment_requests (company_id, invoice_id, vendor_id, created_by, amount, "
-                            "request_hash) VALUES (1, :i, 1, 1, 1500, :h) RETURNING id"),
-                       {"i": inv, "h": HASH}).scalar()
-        c.execute(text("INSERT INTO approvals (company_id, payment_request_id, approver_id, approve, hmac_signature) "
-                       "VALUES (1, :p, 2, true, 'sig')"), {"p": pr})
+        inv = c.execute(text("INSERT INTO invoices (company_id, vendor_id, source_key, source_hash, source_mime, "
+                             "source_size) VALUES (1, 1, 'pr', :h, 'application/pdf', 10) RETURNING id"),
+                        {"h": "d" * 64}).scalar()
+        return c.execute(text("INSERT INTO payment_requests (company_id, invoice_id, vendor_id, created_by, amount, "
+                              "request_hash) VALUES (1, :i, 1, 1, 1500, :h) RETURNING id"),
+                         {"i": inv, "h": HASH}).scalar()
+
+
+def test_api_cannot_forge_an_approval_or_read_the_audit_log(engine, payment_request):
+    from sqlalchemy import exc, text
     with pytest.raises(exc.ProgrammingError, match="permission denied"), engine.begin() as c:
         _as_app(c, 1)
-        c.execute(text("UPDATE approvals SET approve = false"))
+        c.execute(text(APPROVAL), {"p": payment_request})
+    with pytest.raises(exc.ProgrammingError, match="permission denied"), engine.begin() as c:
+        _as_app(c, 1)
+        c.execute(text("SELECT count(*) FROM audit_log"))
+
+
+def test_gateway_approvals_are_append_only_and_expire_in_72h(engine, payment_request):
+    from sqlalchemy import exc, text
+    with engine.begin() as c:
+        _as_app(c, 1, role="securefin_gateway")
+        c.execute(text(APPROVAL), {"p": payment_request})
+        hours = c.execute(text("SELECT extract(epoch FROM expires_at - signed_at) / 3600 FROM approvals")).scalar()
+    assert round(hours) == 72
+    with pytest.raises(exc.IntegrityError), engine.begin() as c:  # the same person cannot approve twice
+        _as_app(c, 1, role="securefin_gateway")
+        c.execute(text(APPROVAL), {"p": payment_request})
+    for stmt in ("UPDATE approvals SET approve = false", "DELETE FROM approvals"):
+        with pytest.raises(exc.ProgrammingError, match="permission denied"), engine.begin() as c:
+            _as_app(c, 1, role="securefin_gateway")
+            c.execute(text(stmt))
+
+
+def test_gateway_audit_log_is_append_only_and_per_company(engine):
+    from sqlalchemy import exc, text
+    row = ("INSERT INTO audit_log (company_id, action, source_service, prev_hash, entry_hash) "
+           "VALUES (:c, 'authorize', 'gateway', :p, :e)")
+    with engine.begin() as c:
+        _as_app(c, 1, role="securefin_gateway")
+        c.execute(text(row), {"c": 1, "p": "0" * 64, "e": "1" * 64})
+    with pytest.raises(exc.ProgrammingError, match="row-level security"), engine.begin() as c:
+        _as_app(c, 1, role="securefin_gateway")
+        c.execute(text(row), {"c": 2, "p": "1" * 64, "e": "2" * 64})
+    with pytest.raises(exc.ProgrammingError, match="permission denied"), engine.begin() as c:
+        _as_app(c, 1, role="securefin_gateway")
+        c.execute(text("UPDATE audit_log SET decision = 'ALLOW'"))
 
 
 def test_money_columns_are_numeric(engine):

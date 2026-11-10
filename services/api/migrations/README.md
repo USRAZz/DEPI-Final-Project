@@ -21,7 +21,10 @@ SELECT set_config('app.company_id', '42', true);  -- company id from the user's 
 COMMIT;
 ```
 
-`securefin_app` can only SELECT and INSERT on `approvals` and `audit_events` (append-only; the gateway writes them).
+Write ownership (issue #15): `approvals` and `audit_log` belong to the gateway. Role `securefin_gateway` may only
+SELECT and INSERT them (append-only); `securefin_app` (the api) has no access to them and reads through gateway
+endpoints. `approvals.expires_at` defaults to 72 hours after signing. `audit_log` columns follow the `AuditEntry` contract
+plus `company_id`; the chain starts with `prev_hash = '0' * 64`.
 
 ## Decisions in 0001
 

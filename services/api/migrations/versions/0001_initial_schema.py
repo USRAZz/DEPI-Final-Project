@@ -11,11 +11,13 @@ Decisions (week 2, defaults taken 2026-11-10; see deferred/SCHEMA_PROPOSAL.md):
 
 How the services must connect (PostgreSQL superusers and table owners skip RLS):
     BEGIN;
-    SET LOCAL ROLE securefin_app;
+    SET LOCAL ROLE securefin_app;        -- the api; the gateway uses securefin_gateway
     SELECT set_config('app.company_id', '<company id from the session>', true);
     ... queries ...
     COMMIT;
-securefin_app may only SELECT/INSERT approvals and audit_events (append-only; the gateway is their writer).
+Write ownership (GitHub issue #15): approvals and audit_log belong to the gateway. securefin_gateway may only
+SELECT and INSERT them (append-only, no UPDATE/DELETE). securefin_app (the api) has no access to them at all,
+so the api cannot forge an approval or edit history; it reads them through gateway endpoints.
 
 Revision ID: 0001
 Revises:
@@ -28,14 +30,13 @@ down_revision = None
 branch_labels = None
 depends_on = None
 
-APP_ROLE = "securefin_app"
+APP_ROLE = "securefin_app"          # api
+GATEWAY_ROLE = "securefin_gateway"  # gateway: the only writer of approvals and audit_log
 INVOICE_STATUSES = ("VALIDATED", "NEEDS-REVIEW", "FLAGGED", "VENDOR_CHANGE_PENDING",
                     "PENDING_APPROVAL", "PAID_SIMULATED", "REJECTED")
 ROLES = ("viewer", "accountant", "approver", "admin")
-# Every table with company_id; companies itself is filtered on id.
-TENANT_TABLES = ("users", "vendors", "invoices", "invoice_line_items", "payment_requests", "approvals",
-                 "audit_events")
-APPEND_ONLY = ("approvals", "audit_events")
+API_TABLES = ("users", "vendors", "invoices", "invoice_line_items", "payment_requests")
+GATEWAY_TABLES = ("approvals", "audit_log")
 
 
 def _in(values) -> str:
@@ -154,49 +155,61 @@ CREATE TABLE approvals (
     comment             TEXT NOT NULL DEFAULT '' CHECK (length(comment) <= 500),
     hmac_signature      TEXT NOT NULL,
     signed_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
-    UNIQUE (payment_request_id, approver_id),  -- one vote per approver
+    -- An approval older than this is EXPIRED and not counted (gateway approval_expiry_hours = 72).
+    expires_at          TIMESTAMPTZ NOT NULL DEFAULT now() + interval '72 hours',
+    CHECK (expires_at > signed_at),
+    UNIQUE (payment_request_id, approver_id),  -- one person cannot approve twice
     FOREIGN KEY (company_id, payment_request_id) REFERENCES payment_requests (company_id, id),
     FOREIGN KEY (company_id, approver_id) REFERENCES users (company_id, id)
 );
 
-CREATE TABLE audit_events (
-    id          BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    company_id  BIGINT NOT NULL REFERENCES companies(id),
-    actor_id    BIGINT,
-    action      TEXT NOT NULL,
-    payload     JSONB NOT NULL DEFAULT '{{}}'::jsonb,  -- bank and personal data masked before insert
-    decision    TEXT,
-    created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
-    prev_hash   CHAR(64),
-    entry_hash  CHAR(64) NOT NULL UNIQUE,
-    FOREIGN KEY (company_id, actor_id) REFERENCES users (company_id, id)
+-- Columns follow contracts/securefin_contracts/audit.py AuditEntry, plus company_id (GitHub issue #15).
+-- Hash chain: entry_hash[n] = SHA256(entry_data[n] + entry_hash[n-1]); the first prev_hash is '0' * 64.
+CREATE TABLE audit_log (
+    id              BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    timestamp       TIMESTAMPTZ NOT NULL DEFAULT now(),
+    company_id      BIGINT NOT NULL REFERENCES companies(id),
+    user_id         BIGINT,
+    action          TEXT NOT NULL CHECK (length(action) <= 100),
+    tool_call       TEXT,
+    parameters      JSONB NOT NULL DEFAULT '{{}}'::jsonb,  -- already masked by the caller
+    decision        TEXT,
+    risk_level      TEXT,
+    result          TEXT,
+    source_service  TEXT NOT NULL,
+    prev_hash       CHAR(64) NOT NULL CHECK (prev_hash ~ '^[0-9a-f]{{64}}$'),
+    entry_hash      CHAR(64) NOT NULL UNIQUE CHECK (entry_hash ~ '^[0-9a-f]{{64}}$'),
+    FOREIGN KEY (company_id, user_id) REFERENCES users (company_id, id)
 );
-CREATE INDEX audit_events_company_idx ON audit_events (company_id, id);
+CREATE INDEX audit_log_company_idx ON audit_log (company_id, id);
 """
 
 
 def upgrade() -> None:
     op.execute(SCHEMA)
-    op.execute(f"""
-        DO $$ BEGIN
-            IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '{APP_ROLE}') THEN
-                CREATE ROLE {APP_ROLE} NOLOGIN;
-            END IF;
-        END $$;
-    """)
+    for role in (APP_ROLE, GATEWAY_ROLE):
+        op.execute(f"""
+            DO $$ BEGIN
+                IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '{role}') THEN
+                    CREATE ROLE {role} NOLOGIN;
+                END IF;
+            END $$;
+        """)
     op.execute(f"ALTER TABLE companies ENABLE ROW LEVEL SECURITY; ALTER TABLE companies FORCE ROW LEVEL SECURITY;"
                f"CREATE POLICY tenant_isolation ON companies USING (id = {TENANT}) WITH CHECK (id = {TENANT});"
                f"GRANT SELECT ON companies TO {APP_ROLE};")
-    for t in TENANT_TABLES:
+    for t in API_TABLES + GATEWAY_TABLES:
         op.execute(f"ALTER TABLE {t} ENABLE ROW LEVEL SECURITY; ALTER TABLE {t} FORCE ROW LEVEL SECURITY;"
                    f"CREATE POLICY tenant_isolation ON {t} "
                    f"USING (company_id = {TENANT}) WITH CHECK (company_id = {TENANT});")
-        grants = "SELECT, INSERT" if t in APPEND_ONLY else "SELECT, INSERT, UPDATE, DELETE"
-        op.execute(f"GRANT {grants} ON {t} TO {APP_ROLE};")
+    for t in API_TABLES:
+        op.execute(f"GRANT SELECT, INSERT, UPDATE, DELETE ON {t} TO {APP_ROLE};")
+    for t in GATEWAY_TABLES:  # append-only, and only for the gateway
+        op.execute(f"GRANT SELECT, INSERT ON {t} TO {GATEWAY_ROLE};")
 
 
 def downgrade() -> None:
-    for t in ("audit_events", "approvals", "payment_requests", "invoice_line_items", "invoices", "vendors",
-              "users", "companies"):
+    for t in GATEWAY_TABLES[::-1] + API_TABLES[::-1] + ("companies",):
         op.execute(f"DROP TABLE IF EXISTS {t} CASCADE;")
-    op.execute(f"DROP ROLE IF EXISTS {APP_ROLE};")
+    for role in (APP_ROLE, GATEWAY_ROLE):
+        op.execute(f"DROP ROLE IF EXISTS {role};")
