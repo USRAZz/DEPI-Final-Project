@@ -121,6 +121,27 @@ def test_header_pass_fixes_latin_letter_inside_arabic(monkeypatch):
     assert text == "مصنع"
 
 
+def test_header_words_do_not_replace_a_whole_phrase():
+    # STRESS3-013: the full page read one box, the crop read three word boxes, one of them surer
+    full = [("شركة المرسى للخدمات", [924, 238, 1176, 289], 0.974)]
+    crop = [("المرسى", [1019, 246, 1106, 285], 0.919), ("شركة", [1102, 245, 1170, 281], 0.996),
+            ("للخدمات", [932, 248, 1019, 277], 0.995)]
+    merged = ocr.merge_header(full, crop, page_height=1600)
+    assert [t for t, _ in merged] == ["شركة المرسى للخدمات"]
+
+
+def test_header_crop_needs_a_clear_margin():
+    # STRESS-022: the crop dropped a letter ('السنبة') but scored a little higher
+    full = [("شركة السنبلة للتجارة", [807, 247, 1000, 280], 0.953)]
+    crop = [("شركة السنبة للتجارة", [802, 242, 1003, 285], 0.983)]
+    assert [t for t, _ in ocr.merge_header(full, crop, page_height=1600)] == ["شركة السنبلة للتجارة"]
+
+
+def test_letters_inside_amounts_are_fixed():
+    assert ocr.fix_numbers("1,521.B0 EGP VAT 14%") == "1,521.80 EGP VAT 14%"
+    assert ocr.fix_numbers("INV-2026-0042 SO20260000001234") == "INV-2026-0042 SO20260000001234"
+
+
 class FakePaddle:
     """Returns page-pixel boxes; for the 2x header crop it returns them in crop pixels, like PaddleOCR."""
 

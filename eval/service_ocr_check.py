@@ -22,10 +22,17 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--set", dest="dataset", choices=("all", *DATASETS), default="all")
     parser.add_argument("--limit", type=int, default=0)
+    parser.add_argument("--invoice-id", nargs="+", help="only these manifest invoice ids")
+    parser.add_argument("--save-text", type=Path, help="write each OCR text to DIR/<invoice>.txt (keep local)")
     parser.add_argument("--out", type=Path, default=ROOT / "eval" / "results" / "service_ocr.csv")
     args = parser.parse_args()
 
-    records = load_records(args.dataset)[: args.limit or None]
+    records = load_records(args.dataset)
+    if args.invoice_id:
+        records = [r for r in records if r[1].stem in set(args.invoice_id)]
+    records = records[: args.limit or None]
+    if args.save_text:
+        args.save_text.mkdir(parents=True, exist_ok=True)
     args.out.parent.mkdir(parents=True, exist_ok=True)
     hits = total = 0
     seconds = []
@@ -37,6 +44,8 @@ def main() -> int:
             start = time.perf_counter()
             text, _ = extract_text_and_confidence(pdf)
             seconds.append(time.perf_counter() - start)
+            if args.save_text:
+                (args.save_text / f"{pdf.stem}.txt").write_text(text, encoding="utf-8")
             expected = expected_fields(row)
             ok = {k: any(has_value(text, v, fold_arabic=True) for v in vals) for k, vals in expected.items()}
             for k, good in ok.items():

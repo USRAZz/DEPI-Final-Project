@@ -10,6 +10,7 @@ back in right-to-left order within each visual line (PaddleOCR returns them left
 """
 import json
 import os
+import re
 from functools import lru_cache
 from pathlib import Path
 
@@ -108,49 +109,94 @@ def _overlap(a: list[float], b: list[float]) -> float:
     return inter / min(area_a, area_b)
 
 
+HEADER_MARGIN = 0.05  # the crop reading must be this much surer (mean score) to replace the full-page one
+
+
 def merge_header(full: list, crop: list, page_height: float) -> list[tuple[str, list[float]]]:
-    """Merge full-page Arabic boxes with the header-crop reading (port of eval/ocr_benchmark.py).
-    A full-page Arabic word is replaced by the crop's word in the same place when the crop is surer, or
-    when the full page mixed a Latin letter into Arabic (e.g. 'مصiع'). Crop words with no match are added."""
-    import re
-    merged, used = [], set()
-    for text, box, score in full:
-        matches = [(i, c) for i, c in enumerate(crop)
-                   if (box[1] + box[3]) / 2 < page_height * HEADER_FRACTION and _overlap(box, c[1]) >= 0.45]
-        arabic = [(i, c) for i, c in matches if _is_ar(c[0]) and not any(ch.isascii() and ch.isalpha() for ch in c[0])]
-        if arabic and re.search(r"[؀-ۿ][A-Za-z][؀-ۿ]", text):
-            fix = " ".join(c[0] for _, c in arabic)
-            text = " ".join(fix if _is_ar(tok) and any(ch.isascii() and ch.isalpha() for ch in tok) else tok
-                            for tok in text.split())
-            used.update(i for i, _ in matches)
-        elif arabic and _is_ar(text):
-            i, best = max(arabic, key=lambda m: m[1][2])
-            if _key(best[0]) == _key(text):
-                used.add(i)
-            elif best[2] > score + 0.01:
-                text = best[0]
-                used.add(i)
+    """Merge full-page Arabic boxes with the header-crop reading.
+    The two passes split text differently (one box 'شركة المرسى للخدمات' vs three word boxes), so boxes that
+    overlap are compared as one group: the full-page group's text against the crop group's text, both read
+    right to left. The crop group wins only when the full page mixed a Latin letter into Arabic ('مصiع') or
+    the crop is clearly surer (HEADER_MARGIN); differing Latin readings are both kept. Crop boxes that overlap
+    nothing are text the full page missed."""
+    limit = page_height * HEADER_FRACTION
+    head = [i for i, (_, b, _) in enumerate(full) if (b[1] + b[3]) / 2 < limit]
+    parent = {("f", i): ("f", i) for i in head} | {("c", j): ("c", j) for j in range(len(crop))}
+
+    def root(n):
+        while parent[n] != n:
+            parent[n] = parent[parent[n]]
+            n = parent[n]
+        return n
+
+    for i in head:
+        for j, c in enumerate(crop):
+            if _overlap(full[i][1], c[1]) >= 0.45:
+                parent[root(("f", i))] = root(("c", j))
+    groups: dict = {}
+    for n in parent:
+        groups.setdefault(root(n), []).append(n)
+
+    def text(entries):
+        return " ".join(order_boxes([e[0] for e in entries], [e[1] for e in entries], right_to_left=True))
+
+    def latin_in_arabic(t):
+        return re.search(r"[؀-ۿ][A-Za-z][؀-ۿ]", t) is not None
+
+    def mean(entries):
+        return sum(e[2] for e in entries) / len(entries)
+
+    chosen = {i: [full[i]] for i in range(len(full)) if i not in head}  # body: untouched
+    for members in groups.values():
+        f = [full[i] for kind, i in sorted(members) if kind == "f"]
+        c = [crop[j] for kind, j in sorted(members) if kind == "c"]
+        if not f:
+            chosen[("c", members[0][1])] = c
+            continue
+        ft, ct = text(f), (text(c) if c else "")
+        first = min(i for kind, i in members if kind == "f")
+        if not c or _key(ft) == _key(ct):
+            chosen[first] = f
+        elif not _is_ar(ct):  # Latin ids/IBANs: keep both readings, one of them is often right
+            chosen[first] = f + c
+        elif (latin_in_arabic(ft) and not latin_in_arabic(ct)) or mean(c) > mean(f) + HEADER_MARGIN:
+            chosen[first] = c
         else:
-            used.update(i for i, c in matches if _key(c[0]) == _key(text))
-        merged.append((text, box))
-    merged.extend((c[0], c[1]) for i, c in enumerate(crop) if i not in used)
-    return merged
+            chosen[first] = f
+    return [(t, b) for es in chosen.values() for t, b, _ in es]
+
+
+_NUM_TOKEN = re.compile(r"(?<![\w])[0-9BOoSlI]{1,3}(?:[.,][0-9BOoSlI]{3})*[.,][0-9BOoSlI]{2}(?![\w])")
+_NUM_FIX = str.maketrans("BOoSlI", "800511")
+
+
+def fix_numbers(line: str) -> str:
+    """Letters the recognizer reads inside amounts ('1,521.B0' -> '1,521.80'). Only tokens shaped like an
+    amount with at least three real digits are touched, so words and ids are left alone."""
+    return _NUM_TOKEN.sub(lambda m: m[0].translate(_NUM_FIX) if sum(ch.isdigit() for ch in m[0]) >= 3 else m[0],
+                          line)
+
+
+def _paddle_text(full_pl: list[dict], head_pl: list[dict], en_pl: list[dict], page_height: float) -> list[str]:
+    """Text lines from the three PaddleOCR passes (pure: no model, so it can be tested and tuned offline)."""
+    full, crop = _entries(full_pl), _entries(head_pl, HEADER_SCALE)
+    if full is None or crop is None:  # boxes missing: keep both readings in engine order
+        lines = [t for p in full_pl + head_pl for t in p.get("rec_texts", [])]
+    else:
+        merged = merge_header(full, crop, page_height)
+        lines = order_boxes([t for t, _ in merged], [b for _, b in merged], right_to_left=True)
+    for p in en_pl:
+        lines.extend(order_boxes([str(t) for t in p.get("rec_texts", [])],
+                                 [list(b) for b in p.get("rec_boxes", [])], right_to_left=False))
+    return [fix_numbers(line) for line in lines]
 
 
 def _paddle(img) -> tuple[str, float | None]:
     ar = _paddle_model("ar")
     full_pl = _paddle_payloads(ar, img)
     head_pl = _paddle_payloads(ar, _header_image(img))
-    full, crop = _entries(full_pl), _entries(head_pl, HEADER_SCALE)
-    if full is None or crop is None:  # boxes missing: keep both readings in engine order
-        lines = [t for p in full_pl + head_pl for t in p.get("rec_texts", [])]
-    else:
-        merged = merge_header(full, crop, img.height)
-        lines = order_boxes([t for t, _ in merged], [b for _, b in merged], right_to_left=True)
     en_pl = _paddle_payloads(_paddle_model("en"), img)
-    for p in en_pl:
-        lines.extend(order_boxes([str(t) for t in p.get("rec_texts", [])],
-                                 [list(b) for b in p.get("rec_boxes", [])], right_to_left=False))
+    lines = _paddle_text(full_pl, head_pl, en_pl, img.height)
     scores = [float(s) for p in full_pl + en_pl for s in p.get("rec_scores", [])]  # full-page passes only
     return "\n".join(lines), (round(sum(scores) / len(scores), 3) if scores else None)
 

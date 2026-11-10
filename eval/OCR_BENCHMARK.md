@@ -149,4 +149,20 @@ python eval/ocr_benchmark.py --engine tesseract --set all --tesseract-psm 11 --o
 | Before: 200 dpi render, full-page ar + en | 1,962/2,032 (96.6%) | 124/130 | 171/228 | 225/228 | 11.24 s |
 | After: embedded scan at native size + Arabic header pass | **1,964/2,032 (96.7%)** | **126/130** | 168/228 | **228/228** | **8.79 s** |
 
-Per invoice: vendor fixed on INV-003/013/042, STRESS-016/025, STRESS3-012; vendor lost on INV-008, STRESS-022, STRESS3-007, STRESS3-013; three descriptions and one tax value lost. Net +2 fields and 22% faster; the vendor regressions need a look at the header merge.
+Per invoice: vendor fixed on INV-003/013/042, STRESS-016/025, STRESS3-012; vendor lost on INV-008, STRESS-022, STRESS3-007, STRESS3-013; three descriptions and one tax value lost. Net +2 fields and 22% faster.
+
+**Review of every remaining miss (2026-11-10).** The raw OCR text of the 29 invoices with misses was compared with the expected values (`--invoice-id ... --save-text DIR`). Causes:
+
+1. *Header merge, 4 vendors.* The full page and the 2x header crop split text differently: one box `شركة المرسى للخدمات` against three word boxes. The old merge compared single words, so one surer word replaced the whole phrase (word order broke on STRESS3-007/013) or crop words were added twice (`مكتبة مكتبة ال الصفوة` on INV-008). On STRESS-022 the crop dropped a letter (`السنبة`) but scored 0.03 higher and won.
+2. *Letters inside amounts, 1 tax.* `1,521.B0` on STRESS-003.
+3. *Arabic item descriptions in degraded table cells, 60 fields.* The recognizer drops dots and thin strokes (`خمة` for `خدمة`, `اسشاربة` for `استشارية`); on the two bilingual STRESS-030 / STRESS2-030 pages whole cells are lost. Re-reading the whole page enhanced and enlarged 2x did not help (3/19 descriptions before and after on six such invoices) and took 3x longer, so this is a recognition limit on these images, not a merge problem. The downstream LLM extraction sees the misspelled text; it is not fixed in OCR.
+
+Fixes in `ocr.py`: overlapping boxes from the two passes are compared as one group, read right to left. The crop group replaces the full-page group only when the full page mixed a Latin letter into Arabic or the crop's mean score is higher by `HEADER_MARGIN` = 0.05. Differing Latin readings (ids, IBANs) are both kept. Amount-shaped tokens with at least three digits get `B O o S l I` read as digits. The margin was tuned on cached raw output of all 130 invoices (0.03 and 0.05 tie; 0.0, 0.02 and 0.1 lose one vendor each).
+
+| Service configuration (fresh run on all 130) | Field hits | Vendor | Account | Tax | Descriptions | Mean time/page |
+|---|---:|---:|---:|---:|---:|---:|
+| Before (200 dpi, full page ar + en) | 1,962/2,032 (96.6%) | 124/130 | 130/130 | 129/130 | 171/228 | 11.24 s |
+| Header pass, word-level merge | 1,964/2,032 (96.7%) | 126/130 | 130/130 | 129/130 | 168/228 | 8.79 s |
+| Header pass, group merge + amount fix | **1,969/2,032 (96.9%)** | **130/130** | **130/130** | **130/130** | 168/228 | 9.24 s |
+
+Every field outside the item table now matches on all 130 invoices. The 63 remaining misses are 60 Arabic descriptions and 3 line totals, all in the item table of STRESS-tier pages (STRESS-004 line 2 is a label mismatch, see above).
