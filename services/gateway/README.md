@@ -56,3 +56,17 @@ Set `POLICY_DIR` to point at a different folder.
 Signing key: env `APPROVAL_HMAC_KEY`, at least 32 bytes, never in Git. Generate one with
 `python -c "import secrets; print(secrets.token_hex(32))"`.
 The HTTP endpoints and the `approvals` table are added in the next PR.
+
+## Approval endpoints
+
+| Endpoint | Body | Returns |
+|---|---|---|
+| `POST /v1/approvals/{payment_request_id}` | `ApprovalRequest` (must include `approver_role` and `company_id`, set by the api from the session) | `ApprovalResult` |
+| `POST /v1/execute-check` | `ExecuteCheckRequest` | `ExecuteCheckResult` |
+
+- `/v1/approvals`: refused with **403** and a list of reasons (maker-checker, wrong role, wrong company, already decided, already rejected, not awaiting approval). Nothing is stored when refused.
+- `/v1/execute-check`: the api **must call this right before executing a payment**. Pay only if `allowed` is `true`.
+- **404** unknown payment request; **503** if the api is unreachable or `APPROVAL_HMAC_KEY` is missing or short (nothing is approved).
+- The gateway reads the payment request from the api: `GET {API_URL}/payments/{id}` returning `PaymentRequestInfo`.
+  `API_URL` defaults to `http://api:8000` (Docker); outside Docker use `http://localhost:8000`.
+- Approvals are kept in memory for now (lost on restart). The database-backed store follows once the `approvals` table migration exists.

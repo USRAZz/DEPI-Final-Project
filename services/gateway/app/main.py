@@ -1,16 +1,32 @@
-from fastapi import FastAPI
+from datetime import UTC, datetime
+
+from fastapi import FastAPI, HTTPException
 from pydantic import ValidationError
-from securefin_contracts import AuthorizeRequest, Decision, GatewayDecision, ToolName
+from securefin_contracts import (
+    ApprovalRequest,
+    ApprovalResult,
+    AuthorizeRequest,
+    Decision,
+    ExecuteCheckRequest,
+    ExecuteCheckResult,
+    GatewayDecision,
+    ToolName,
+)
 from securefin_contracts.actions import CreatePaymentParams
 
+from .approvals import ApprovalDenied, ApprovalKeyError, execute_check, load_hmac_key, submit_approval
 from .audit_chain import compute_hash  # noqa: F401  (used by the real audit endpoint)
+from .payments_client import PaymentNotFoundError, PaymentsUnavailableError, build_payments_client
 from .policy import BASE_CURRENCY, get_policy
 from .risk_client import RiskUnavailableError, build_risk_client
+from .stores import DuplicateApprovalError, InMemoryApprovalStore
 
 app = FastAPI(title="SecureFin Security Gateway")
 
 POLICY = get_policy()  # fails at start-up if policies/ is missing or invalid (fail closed)
 RISK_CLIENT = build_risk_client(POLICY.defaults.gateway.timeout_ms)
+PAYMENTS_CLIENT = build_payments_client(POLICY.defaults.gateway.timeout_ms)
+APPROVAL_STORE = InMemoryApprovalStore()  # TODO: database-backed store once the approvals table exists
 
 
 @app.get("/health")
@@ -56,3 +72,47 @@ def authorize(req: AuthorizeRequest) -> GatewayDecision:
         return GatewayDecision(decision=Decision.PENDING_APPROVAL, reasons=reasons, checks_passed=passed,
                                risk_score=risk_score, required_approvers=approvers)
     return GatewayDecision(decision=Decision.ALLOW, checks_passed=passed)
+
+
+def _load_payment(payment_request_id: int):
+    try:
+        return PAYMENTS_CLIENT.get(payment_request_id)
+    except PaymentNotFoundError:
+        raise HTTPException(status_code=404, detail=["payment request not found"]) from None
+    except PaymentsUnavailableError:
+        raise HTTPException(status_code=503, detail=["payment service unavailable: nothing approved"]) from None
+
+
+def _signing_key() -> bytes:
+    try:
+        return load_hmac_key()
+    except ApprovalKeyError:
+        raise HTTPException(status_code=503, detail=["approval signing unavailable: nothing approved"]) from None
+
+
+@app.post("/v1/approvals/{payment_request_id}", response_model=ApprovalResult)
+def approve(payment_request_id: int, req: ApprovalRequest) -> ApprovalResult:
+    if req.payment_request_id != payment_request_id:
+        raise HTTPException(status_code=422, detail=["payment request id in path and body differ"])
+    key = _signing_key()
+    payment = _load_payment(payment_request_id)
+    try:
+        result, record = submit_approval(req, payment, APPROVAL_STORE.list(payment_request_id), POLICY, key,
+                                         datetime.now(UTC))
+    except ApprovalDenied as e:
+        raise HTTPException(status_code=403, detail=e.reasons) from None
+    if record is not None:
+        try:
+            APPROVAL_STORE.add(record)
+        except DuplicateApprovalError:
+            raise HTTPException(status_code=409, detail=["this approver has already decided"]) from None
+    return result
+
+
+@app.post("/v1/execute-check", response_model=ExecuteCheckResult)
+def execute_check_endpoint(req: ExecuteCheckRequest) -> ExecuteCheckResult:
+    """The api calls this right before executing a payment. Anything but allowed=true means do not pay."""
+    key = _signing_key()
+    payment = _load_payment(req.payment_request_id)
+    return execute_check(req, payment, APPROVAL_STORE.list(req.payment_request_id), POLICY, key,
+                         datetime.now(UTC))
