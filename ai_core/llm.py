@@ -12,7 +12,8 @@ from .privacy import mask_messages
 
 load_dotenv()
 
-# Decision (SecureFin plan 1.2): OpenAI only. Every message is masked (ai_core.privacy) before it is sent.
+
+# Decision (SecureFin plan 1.2): OpenAI and OpenRouter support. Every message is masked (ai_core.privacy) before it is sent.
 PROVIDERS = {
     "openai": {
         "base_url": None,
@@ -23,6 +24,7 @@ PROVIDERS = {
         "key_env": "OPENROUTER_API_KEY",
     },
 }
+
 
 
 class BudgetExceeded(Exception):
