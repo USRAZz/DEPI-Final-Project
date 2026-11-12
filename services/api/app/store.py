@@ -6,6 +6,7 @@ Every company-facing lookup takes the caller's company_id: a record from another
 company is "not found", never "forbidden", so its existence does not leak.
 """
 
+import hashlib
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
@@ -172,6 +173,11 @@ class Store:
         self.bank_accounts[account_id] = self.bank_accounts[account_id].model_copy(update={"status": status})
 
 
+def _sample_sha(name) -> str:
+    """Stand-in file hash for the sample invoices (there are no real files behind them)."""
+    return hashlib.sha256(f"sample-invoice-{name}".encode()).hexdigest()
+
+
 def seeded_store() -> Store:
     s = Store()
     created = _at("2026-10-01T09:00:00")
@@ -213,18 +219,19 @@ def seeded_store() -> Store:
     # with its foreign keys: 371 is the earlier, paid invoice that 412 duplicates.
     s.invoices[INV_0371] = Invoice(
         id=INV_0371, company_id=DELTA, vendor_id=NILE, source=InvoiceSource.UPLOAD,
-        status=InvoiceStatus.PAID_SIMULATED, file_key="invoices/sample/0371.pdf", category="materials",
+        status=InvoiceStatus.PAID_SIMULATED, file_key="invoices/sample/0371.pdf", file_sha256=_sample_sha("0371"), category="materials",
         uploaded_by=SARA, created_at=_at("2026-10-12T09:00:00"),
     )
     for inv_id, vendor in [(415, EGPACK), (416, CAIRONET), (417, AMAL)]:
         s.invoices[inv_id] = Invoice(
             id=inv_id, company_id=DELTA, vendor_id=vendor, source=InvoiceSource.UPLOAD,
-            status=InvoiceStatus.VALIDATED, file_key=f"invoices/sample/0{inv_id}.pdf",
+            status=InvoiceStatus.VALIDATED, file_key=f"invoices/sample/0{inv_id}.pdf", file_sha256=_sample_sha(inv_id),
             uploaded_by=SARA, created_at=_at("2026-11-02T09:00:00"),
         )
     s.invoices[INV_0412] = Invoice(
         id=INV_0412, company_id=DELTA, vendor_id=NILE, source=InvoiceSource.UPLOAD, status=InvoiceStatus.FLAGGED,
-        file_key="invoices/sample/0412.pdf", duplicate_of=INV_0371, category="materials",
+        file_key="invoices/sample/0412.pdf", file_sha256=_sample_sha("0412"), duplicate_of=INV_0371,
+        category="materials",
         uploaded_by=SARA, created_at=_at("2026-11-02T09:10:00"),
         fields=InvoiceData(
             vendor="Nile Paper", invoice_no="INV-2026-0412", date="2026-10-28", amount=Decimal("15400.00"),

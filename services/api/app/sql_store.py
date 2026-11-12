@@ -29,6 +29,7 @@ from .db import (
     ApprovalResponseRow,
     BankAccountRow,
     CompanyRow,
+    InvoiceLineItemRow,
     InvoiceRow,
     PaymentRequestRow,
     PaymentRiskRow,
@@ -209,9 +210,18 @@ class SqlStore:
             _insert_all(s, data)
             if s.get_bind().dialect.name == "postgresql":
                 # rows came with their own ids: move each id sequence past them so new rows do not collide
-                for table in ("companies", "users", "vendors", "bank_accounts", "invoices", "payment_requests"):
+                for table in ("companies", "users", "vendors", "bank_accounts", "invoices", "invoice_line_items",
+                              "payment_requests"):
                     s.execute(text(f"SELECT setval(pg_get_serial_sequence('{table}', 'id'), "
                                    f"(SELECT coalesce(max(id), 0) + 1 FROM {table}), false)"))
+
+
+def _line_items(inv: Invoice) -> list[InvoiceLineItemRow]:
+    """The extractor's line items as NUMERIC rows, numbered from 1 in document order."""
+    items = inv.fields.line_items if inv.fields else []
+    return [InvoiceLineItemRow(company_id=inv.company_id, invoice_id=inv.id, position=n, description=item.description,
+                               quantity=item.quantity, unit_price=item.unit_price)
+            for n, item in enumerate(items, start=1)]
 
 
 def _insert_all(s: Session, data: Store) -> None:
@@ -230,6 +240,7 @@ def _insert_all(s: Session, data: Store) -> None:
     for inv in sorted(data.invoices.values(), key=lambda i: i.id):  # an invoice can point to an earlier one
         s.add(InvoiceRow(**{**inv.model_dump(mode="json"), "created_at": inv.created_at}))
         s.flush()
+        s.add_all(_line_items(inv))
     s.add_all(PaymentRequestRow(**dumped(p, status=p.status.value)) for p in data.payment_requests.values())
     s.flush()
     s.add_all(PaymentRiskRow(payment_request_id=rid, **r.model_dump(mode="json"))

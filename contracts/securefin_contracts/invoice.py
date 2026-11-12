@@ -60,6 +60,8 @@ class Invoice(Contract):
     status: InvoiceStatus
     fields: InvoiceData | None = None
     file_key: str = Field(max_length=500)
+    # sha256 of the file bytes (lowercase hex). The database refuses the same file twice per company.
+    file_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
     duplicate_of: int | None = None
     category: str | None = Field(default=None, max_length=64)
     uploaded_by: int | None = None

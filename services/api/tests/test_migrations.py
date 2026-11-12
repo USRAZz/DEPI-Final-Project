@@ -22,8 +22,8 @@ INSERT INTO users (company_id, email, full_name, role, language, is_active, crea
 INSERT INTO vendors (company_id, name, created_at) VALUES (1, 'Nile', now()), (2, 'Delta', now());
 INSERT INTO bank_accounts (company_id, vendor_id, bank_name, iban, status, times_paid, created_at)
     VALUES (1, 1, 'NBE', 'EG380019000500000000263180002', 'verified', 0, now());
-INSERT INTO invoices (company_id, vendor_id, source, status, file_key, created_at, extraction_issues)
-    VALUES (1, 1, 'upload', 'VALIDATED', 'k1', now(), '[]');
+INSERT INTO invoices (company_id, vendor_id, source, status, file_key, file_sha256, created_at, extraction_issues)
+    VALUES (1, 1, 'upload', 'VALIDATED', 'k1', repeat('a', 64), now(), '[]');
 INSERT INTO payment_requests (company_id, invoice_id, vendor_id, bank_account_id, creator_id, amount, currency,
                               status, note, created_at)
     VALUES (1, 1, 1, 1, 1, 1500, 'EGP', 'PENDING_APPROVAL', '', now());
@@ -84,8 +84,45 @@ def test_database_matches_the_orm(engine):
 def test_rows_cannot_point_at_another_companys_rows(engine):
     from sqlalchemy import exc, text
     with pytest.raises(exc.IntegrityError, match="same_company"), engine.begin() as c:  # superuser: only the FK stops it
-        c.execute(text("INSERT INTO invoices (company_id, vendor_id, source, status, file_key, created_at, "
-                       "extraction_issues) VALUES (1, 2, 'upload', 'VALIDATED', 'k2', now(), '[]')"))
+        c.execute(text("INSERT INTO invoices (company_id, vendor_id, source, status, file_key, file_sha256, created_at, "
+                       "extraction_issues) VALUES (1, 2, 'upload', 'VALIDATED', 'k2', repeat('b', 64), now(), '[]')"))
+
+
+INVOICE = ("INSERT INTO invoices (company_id, vendor_id, source, status, file_key, file_sha256, created_at, "
+           "extraction_issues) VALUES (:c, :v, 'upload', 'VALIDATED', :k, :h, now(), '[]')")
+
+
+def test_same_file_twice_is_refused_per_company(engine):
+    from sqlalchemy import exc, text
+    with pytest.raises(exc.IntegrityError, match="file_sha256"), engine.begin() as c:
+        _as(c, 1)
+        c.execute(text(INVOICE), {"c": 1, "v": 1, "k": "k3", "h": "a" * 64})  # same bytes as the seeded invoice
+    with engine.begin() as c:  # another company may hold the same file
+        _as(c, 2)
+        c.execute(text(INVOICE), {"c": 2, "v": 2, "k": "k4", "h": "a" * 64})
+
+
+def test_line_items_are_numeric_and_follow_their_invoice(engine):
+    from sqlalchemy import exc, text
+    item = ("INSERT INTO invoice_line_items (company_id, invoice_id, position, description, quantity, unit_price) "
+            "VALUES (:c, 1, :p, 'paper', :q, 12.50)")
+    with engine.begin() as c:
+        _as(c, 1)
+        c.execute(text(item), {"c": 1, "p": 1, "q": 3})
+    with pytest.raises(exc.IntegrityError, match="quantity"), engine.begin() as c:
+        _as(c, 1)
+        c.execute(text(item), {"c": 1, "p": 2, "q": 0})
+    with pytest.raises(exc.DatabaseError), engine.begin() as c:  # company 2 cannot hang items on company 1's invoice
+        _as(c, 2)
+        c.execute(text(item), {"c": 2, "p": 3, "q": 1})
+
+
+def test_ids_are_bigint(engine):
+    from sqlalchemy import text
+    with engine.begin() as c:
+        types = set(c.execute(text("SELECT data_type FROM information_schema.columns WHERE table_schema = 'public' "
+                                   "AND column_name = 'id'")).scalars())
+    assert types == {"bigint"}
 
 
 def test_status_and_role_only_take_contract_values(engine):
@@ -186,5 +223,5 @@ def test_money_columns_are_numeric(engine):
     with engine.begin() as c:
         types = dict(c.execute(text(
             "SELECT table_name || '.' || column_name, data_type FROM information_schema.columns "
-            "WHERE table_schema = 'public' AND column_name = 'amount'")).all())
+            "WHERE table_schema = 'public' AND column_name IN ('amount', 'quantity', 'unit_price')")).all())
     assert types and set(types.values()) == {"numeric"}

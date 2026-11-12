@@ -33,8 +33,9 @@ def engine():
             INSERT INTO vendors (company_id, name, created_at) VALUES (1, 'Nile', now());
             INSERT INTO bank_accounts (company_id, vendor_id, bank_name, iban, status, times_paid, created_at)
                 VALUES (1, 1, 'NBE', 'EG380019000500000000263180002', 'verified', 0, now());
-            INSERT INTO invoices (company_id, vendor_id, source, status, file_key, created_at, extraction_issues)
-                VALUES (1, 1, 'upload', 'VALIDATED', 'k', now(), '[]');
+            INSERT INTO invoices (company_id, vendor_id, source, status, file_key, file_sha256, created_at,
+                                      extraction_issues)
+                VALUES (1, 1, 'upload', 'VALIDATED', 'k', repeat('a', 64), now(), '[]');
             INSERT INTO payment_requests (company_id, invoice_id, vendor_id, bank_account_id, creator_id, amount,
                                           currency, status, note, created_at)
                 VALUES (1, 1, 1, 1, 1, 1500, 'EGP', 'PENDING_APPROVAL', '', now());

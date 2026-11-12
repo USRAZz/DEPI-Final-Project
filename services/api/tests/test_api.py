@@ -265,3 +265,25 @@ class TestDeployment:
     def test_database_urls_get_the_psycopg_driver(self, url):
         from app.db import normalize_url
         assert normalize_url(url) == "postgresql+psycopg://u:p@host/db?sslmode=require"
+
+
+def test_database_store_keeps_line_items_as_rows():
+    """fields.line_items also land in invoice_line_items, numbered in document order."""
+    from decimal import Decimal
+
+    from app.db import InvoiceLineItemRow
+    from app.store import INV_0412
+    from securefin_contracts import LineItem
+    from sqlalchemy import select
+    from tests.fakes import sql_store_with_sample_data
+
+    sample = seeded_store()
+    inv = sample.invoices[INV_0412]
+    items = [LineItem(description="A4 paper", quantity=Decimal("10"), unit_price=Decimal("1200.00")),
+             LineItem(description="Delivery", quantity=Decimal("1"), unit_price=Decimal("3400.00"))]
+    sample.invoices[INV_0412] = inv.model_copy(update={"fields": inv.fields.model_copy(update={"line_items": items})})
+    store = sql_store_with_sample_data(POSTGRES_URL, data=sample)
+    with store._session() as s:
+        rows = s.scalars(select(InvoiceLineItemRow).order_by(InvoiceLineItemRow.position)).all()
+    assert [(r.position, r.description, r.quantity, r.unit_price) for r in rows] == [
+        (1, "A4 paper", Decimal("10"), Decimal("1200.00")), (2, "Delivery", Decimal("1"), Decimal("3400.00"))]

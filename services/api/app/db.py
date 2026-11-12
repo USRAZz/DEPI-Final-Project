@@ -23,6 +23,7 @@ from securefin_contracts import (
 )
 from sqlalchemy import (
     JSON,
+    BigInteger,
     Boolean,
     CheckConstraint,
     DateTime,
@@ -41,6 +42,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy.pool import NullPool
 
 Json = JSON().with_variant(JSONB(), "postgresql")
+Id = BigInteger().with_variant(Integer, "sqlite")  # BIGINT ids; SQLite only auto-increments INTEGER PRIMARY KEY
 Money = Numeric(14, 2)
 Timestamp = DateTime(timezone=True)
 
@@ -68,7 +70,7 @@ def _tenant_key(table: str) -> UniqueConstraint:
 class CompanyRow(Base):
     __tablename__ = "companies"
     __table_args__ = (_in("companies", "default_language", Language),)
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    id: Mapped[int] = mapped_column(Id, primary_key=True)
     name: Mapped[str] = mapped_column(String(200))
     tax_id: Mapped[str | None] = mapped_column(String(20))
     default_language: Mapped[str] = mapped_column(String(2), default="ar")
@@ -83,7 +85,7 @@ class UserRow(Base):
         _in("users", "language", Language),
         CheckConstraint("email LIKE '_%@_%'", name="ck_users_email"),
     )
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    id: Mapped[int] = mapped_column(Id, primary_key=True)
     company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True)
     email: Mapped[str] = mapped_column(String(254), unique=True)
     full_name: Mapped[str] = mapped_column(String(120))
@@ -96,7 +98,7 @@ class UserRow(Base):
 class VendorRow(Base):
     __tablename__ = "vendors"
     __table_args__ = (_tenant_key("vendors"),)
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    id: Mapped[int] = mapped_column(Id, primary_key=True)
     company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True)
     name: Mapped[str] = mapped_column(String(200))
     tax_id: Mapped[str | None] = mapped_column(String(20))
@@ -115,15 +117,15 @@ class BankAccountRow(Base):
         _in("bank_accounts", "status", BankAccountStatus),
         CheckConstraint("times_paid >= 0", name="ck_bank_accounts_times_paid"),
     )
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    id: Mapped[int] = mapped_column(Id, primary_key=True)
     company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True)
-    vendor_id: Mapped[int] = mapped_column(Integer, index=True)
+    vendor_id: Mapped[int] = mapped_column(Id, index=True)
     bank_name: Mapped[str] = mapped_column(String(120))
     iban: Mapped[str] = mapped_column(String(34))
     status: Mapped[str] = mapped_column(String(20))
     hold_until: Mapped[datetime | None] = mapped_column(Timestamp)
-    verified_by: Mapped[int | None] = mapped_column(Integer)
-    requested_by: Mapped[int | None] = mapped_column(Integer)  # who asked for this account
+    verified_by: Mapped[int | None] = mapped_column(Id)
+    requested_by: Mapped[int | None] = mapped_column(Id)  # who asked for this account
     times_paid: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(Timestamp)
 
@@ -138,20 +140,45 @@ class InvoiceRow(Base):
         _in("invoices", "source", InvoiceSource),
         _in("invoices", "status", InvoiceStatus),
         CheckConstraint("ocr_confidence BETWEEN 0 AND 1", name="ck_invoices_ocr_confidence"),
+        # the exact same file cannot be stored twice per company; same vendor + number is only a duplicate signal
+        UniqueConstraint("company_id", "file_sha256", name="uq_invoices_company_id_file_sha256"),
+        CheckConstraint("length(file_sha256) = 64", name="ck_invoices_file_sha256"),
     )
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    id: Mapped[int] = mapped_column(Id, primary_key=True)
     company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True)
-    vendor_id: Mapped[int | None] = mapped_column(Integer)  # NULL until matched to the vendor registry
+    vendor_id: Mapped[int | None] = mapped_column(Id)  # NULL until matched to the vendor registry
     source: Mapped[str] = mapped_column(String(10))
     status: Mapped[str] = mapped_column(String(30))
     fields: Mapped[dict | None] = mapped_column(Json)  # InvoiceData from the extractor; untrusted, never a payee
     file_key: Mapped[str] = mapped_column(String(500))  # generated object key, never the client's file name
-    duplicate_of: Mapped[int | None] = mapped_column(Integer)
+    file_sha256: Mapped[str] = mapped_column(String(64))  # sha256 of the file bytes, lowercase hex
+    duplicate_of: Mapped[int | None] = mapped_column(Id)
     category: Mapped[str | None] = mapped_column(String(64))
-    uploaded_by: Mapped[int | None] = mapped_column(Integer)
+    uploaded_by: Mapped[int | None] = mapped_column(Id)
     created_at: Mapped[datetime] = mapped_column(Timestamp)
     extraction_issues: Mapped[list] = mapped_column(Json, default=list)
     ocr_confidence: Mapped[float | None] = mapped_column(Float)
+
+
+class InvoiceLineItemRow(Base):
+    """The invoice's items as NUMERIC rows (fields.line_items stays the extractor's raw output)."""
+
+    __tablename__ = "invoice_line_items"
+    __table_args__ = (
+        ForeignKeyConstraint(["company_id", "invoice_id"], ["invoices.company_id", "invoices.id"],
+                             name="fk_invoice_line_items_invoice_id_same_company", ondelete="CASCADE"),
+        UniqueConstraint("invoice_id", "position", name="uq_invoice_line_items_invoice_id_position"),
+        CheckConstraint("position >= 1", name="ck_invoice_line_items_position"),
+        CheckConstraint("quantity > 0", name="ck_invoice_line_items_quantity"),
+        CheckConstraint("unit_price >= 0", name="ck_invoice_line_items_unit_price"),
+    )
+    id: Mapped[int] = mapped_column(Id, primary_key=True)
+    company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True)
+    invoice_id: Mapped[int] = mapped_column(Id, index=True)
+    position: Mapped[int] = mapped_column(Integer)
+    description: Mapped[str] = mapped_column(String(300))
+    quantity: Mapped[Decimal] = mapped_column(Numeric(14, 4))
+    unit_price: Mapped[Decimal] = mapped_column(Money)
 
 
 class PaymentRequestRow(Base):
@@ -166,12 +193,12 @@ class PaymentRequestRow(Base):
         CheckConstraint("amount > 0", name="ck_payment_requests_amount_positive"),
         CheckConstraint("length(currency) = 3", name="ck_payment_requests_currency_code"),
     )
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    id: Mapped[int] = mapped_column(Id, primary_key=True)
     company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True)
-    invoice_id: Mapped[int] = mapped_column(Integer)
-    vendor_id: Mapped[int] = mapped_column(Integer)
-    bank_account_id: Mapped[int] = mapped_column(Integer)
-    creator_id: Mapped[int] = mapped_column(Integer)
+    invoice_id: Mapped[int] = mapped_column(Id)
+    vendor_id: Mapped[int] = mapped_column(Id)
+    bank_account_id: Mapped[int] = mapped_column(Id)
+    creator_id: Mapped[int] = mapped_column(Id)
     amount: Mapped[Decimal] = mapped_column(Money)
     currency: Mapped[str] = mapped_column(String(3))
     status: Mapped[str] = mapped_column(String(30), index=True)
@@ -207,10 +234,10 @@ class ApprovalResponseRow(Base):
         _tenant_fk("approval_responses", "approver_id", "users"),
         _in("approval_responses", "status", ApprovalStatus),
     )
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(Id, primary_key=True, autoincrement=True)
     company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"))
-    payment_request_id: Mapped[int] = mapped_column(Integer, index=True)
-    approver_id: Mapped[int] = mapped_column(Integer)
+    payment_request_id: Mapped[int] = mapped_column(Id, index=True)
+    approver_id: Mapped[int] = mapped_column(Id)
     approve: Mapped[bool] = mapped_column(Boolean)
     status: Mapped[str] = mapped_column(String(20))
     approvals_received: Mapped[int] = mapped_column(Integer)
@@ -230,10 +257,10 @@ class ApprovalRow(Base):
         _tenant_fk("approvals", "approver_id", "users"),
         CheckConstraint("expires_at > signed_at", name="ck_approvals_expiry"),
     )
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(Id, primary_key=True, autoincrement=True)
     company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True)
-    payment_request_id: Mapped[int] = mapped_column(Integer, index=True)
-    approver_id: Mapped[int] = mapped_column(Integer)
+    payment_request_id: Mapped[int] = mapped_column(Id, index=True)
+    approver_id: Mapped[int] = mapped_column(Id)
     approve: Mapped[bool] = mapped_column(Boolean)
     hmac_signature: Mapped[str] = mapped_column(String(128))
     signed_at: Mapped[datetime] = mapped_column(Timestamp)
@@ -249,10 +276,10 @@ class AuditLogRow(Base):
         CheckConstraint("prev_hash ~ '^[0-9a-f]{64}$'", name="ck_audit_log_prev_hash").ddl_if(dialect="postgresql"),
         CheckConstraint("entry_hash ~ '^[0-9a-f]{64}$'", name="ck_audit_log_entry_hash").ddl_if(dialect="postgresql"),
     )
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(Id, primary_key=True, autoincrement=True)
     timestamp: Mapped[datetime] = mapped_column(Timestamp, index=True)
     company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True)
-    user_id: Mapped[int | None] = mapped_column(Integer)
+    user_id: Mapped[int | None] = mapped_column(Id)
     action: Mapped[str] = mapped_column(String(100))
     tool_call: Mapped[str | None] = mapped_column(String(100))
     parameters: Mapped[dict] = mapped_column(Json, default=dict)  # already masked by the caller

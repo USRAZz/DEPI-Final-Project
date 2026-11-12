@@ -114,7 +114,7 @@ def migrated_postgres(url: str):
     return engine
 
 
-def sql_store_with_sample_data(url: str | None = None):
+def sql_store_with_sample_data(url: str | None = None, data=None):
     """SqlStore with the same sample data as seeded_store(): on an in-memory SQLite database, or,
     given a url, on a fresh schema in that database (everything in its public schema is dropped first)."""
     from app.db import Base
@@ -129,5 +129,5 @@ def sql_store_with_sample_data(url: str | None = None):
         engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
         Base.metadata.create_all(engine)
     store = SqlStore(engine)
-    store.load(seeded_store())
+    store.load(data or seeded_store())
     return store
