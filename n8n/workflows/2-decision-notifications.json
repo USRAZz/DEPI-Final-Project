@@ -4,6 +4,80 @@
   "nodes": [
     {
       "parameters": {
+        "formTitle": "Test 2: decision notification",
+        "formDescription": "Pick a decision the gateway could make. The workflow builds the Arabic + English message an approver would get and shows it here. Nothing is sent.",
+        "formFields": {
+          "values": [
+            {
+              "fieldName": "event_type",
+              "fieldLabel": "Decision",
+              "fieldType": "dropdown",
+              "requiredField": true,
+              "defaultValue": "hold = payment on hold",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "hold = payment on hold"
+                  },
+                  {
+                    "option": "block = payment blocked"
+                  },
+                  {
+                    "option": "needs_second_approval = second approver needed"
+                  },
+                  {
+                    "option": "bank_change_pending = vendor bank details changed"
+                  }
+                ]
+              }
+            },
+            {
+              "fieldName": "id",
+              "fieldLabel": "Payment request number (or vendor number for a bank change)",
+              "fieldType": "number",
+              "requiredField": true,
+              "defaultValue": "123"
+            },
+            {
+              "fieldName": "reasons",
+              "fieldLabel": "Reasons, separated by commas",
+              "fieldType": "text",
+              "requiredField": true,
+              "defaultValue": "VENDOR_ACCOUNT_MISMATCH, DUPLICATE_INVOICE"
+            }
+          ]
+        },
+        "responseMode": "onReceived",
+        "options": {
+          "path": "securefin-test-notify",
+          "buttonLabel": "Run"
+        }
+      },
+      "id": "b12",
+      "name": "Test form",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.4,
+      "position": [
+        1100,
+        -300
+      ],
+      "webhookId": "securefin-test-notify"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Test form -> the same event shape the gateway will send. The form path only shows the message on\n// screen; it never sends it, so it is not a way around the signature check.\nconst f = $input.first().json;\nconst type = String(f.event_type).split(' ')[0];\nconst id = Math.max(1, Math.floor(Number(f.id) || 1));\nconst vendor = type === 'bank_change_pending';\nconst reasons = String(f.reasons ?? '').split(',').map((s) => s.trim()).filter(Boolean);\nreturn [{ json: { valid: true, event: {\n  event_id: `form-${$execution.id}`, event_type: type, company_id: 1,\n  payment_request_id: vendor ? null : id, vendor_id: vendor ? id : null, reasons, expires_at: null,\n} } }];"
+      },
+      "id": "b13",
+      "name": "Form to event",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        -300
+      ]
+    },
+    {
+      "parameters": {
         "httpMethod": "POST",
         "path": "securefin/decision-events",
         "responseMode": "responseNode",
@@ -23,7 +97,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Signed text = \"<timestamp>.<raw body>\", so an old request cannot be replayed with a fresh timestamp.\nconst item = $input.first();\nconst headers = item.json.headers ?? {};\nconst raw = (await this.helpers.getBinaryDataBuffer(0, 'data')).toString('utf8');\nconst ts = String(headers['x-securefin-timestamp'] ?? '');\nconst age = Math.abs(Date.now() / 1000 - Number(ts));\nreturn [{ json: {\n  raw,\n  signed: `${ts}.${raw}`,\n  signature: String(headers['x-securefin-signature'] ?? ''),\n  fresh: /^\\d{10}$/.test(ts) && age <= 300,\n  secret_set: String($env.N8N_WEBHOOK_HMAC_SECRET ?? '').length >= 32,\n} }];"
+        "jsCode": "const env = (k) => { try { return String($env[k] ?? ''); } catch (e) { return ''; } };  // '' when unset or blocked\n// Signed text = \"<timestamp>.<raw body>\", so an old request cannot be replayed with a fresh timestamp.\nconst item = $input.first();\nconst headers = item.json.headers ?? {};\nconst raw = (await this.helpers.getBinaryDataBuffer(0, 'data')).toString('utf8');\nconst ts = String(headers['x-securefin-timestamp'] ?? '');\nconst age = Math.abs(Date.now() / 1000 - Number(ts));\nreturn [{ json: {\n  raw,\n  signed: `${ts}.${raw}`,\n  signature: String(headers['x-securefin-signature'] ?? ''),\n  fresh: /^\\d{10}$/.test(ts) && age <= 300,\n  secret_set: env('N8N_WEBHOOK_HMAC_SECRET').length >= 32,\n} }];"
       },
       "id": "b2",
       "name": "Read signed body",
@@ -150,7 +224,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Only ids, the event type and reason codes leave the system: no amounts, vendor names or bank details.\n// The link is built here from APP_BASE_URL, never taken from the payload. There is no approve button:\n// approvals happen in the app, through the gateway.\nconst TEXT = {\n  hold: ['Payment on hold', 'دفعة موقوفة للمراجعة'],\n  block: ['Payment blocked', 'تم حظر الدفعة'],\n  needs_second_approval: ['Second approval needed', 'مطلوب موافقة ثانية'],\n  bank_change_pending: ['Vendor bank details changed: waiting period started', 'تغيير بيانات بنك المورد: بدأت فترة الانتظار'],\n};\nconst clean = (s) => String(s).replace(/[\\u0000-\\u001f]/g, ' ').slice(0, 120);\nconst html = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\nconst e = $input.first().json.event;\nconst base = String($env.APP_BASE_URL ?? '').replace(/\\/+$/, '');\nconst vendor = e.event_type === 'bank_change_pending';\nconst link = vendor ? `${base}/vendors/${e.vendor_id}` : `${base}/payments/${e.payment_request_id}`;\nconst ref = vendor ? `Vendor #${e.vendor_id}` : `Payment request #${e.payment_request_id}`;\nconst reasons = (Array.isArray(e.reasons) ? e.reasons : []).slice(0, 3).map(clean);\nconst [en, ar] = TEXT[e.event_type];\nconst lines = [\n  `${ar}`, `${en}`, '', ref,\n  ...(reasons.length ? ['Top reasons / أهم الأسباب:', ...reasons.map((r, i) => `${i + 1}. ${r}`)] : []),\n  ...(e.expires_at ? [`Until / حتى: ${clean(e.expires_at)}`] : []),\n  '', `Open in SecureFin / افتح في التطبيق: ${link}`,\n];\nconst plain = lines.join('\\n');  // email text; Telegram gets the same lines HTML-escaped\nreturn [{ json: { event_id: e.event_id, subject: `SecureFin: ${en} (${ref})`, plain, text: html(plain) } }];"
+        "jsCode": "const env = (k) => { try { return String($env[k] ?? ''); } catch (e) { return ''; } };  // '' when unset or blocked\n// Only ids, the event type and reason codes leave the system: no amounts, vendor names or bank details.\n// The link is built here from APP_BASE_URL, never taken from the payload. There is no approve button:\n// approvals happen in the app, through the gateway.\nconst TEXT = {\n  hold: ['Payment on hold', 'دفعة موقوفة للمراجعة'],\n  block: ['Payment blocked', 'تم حظر الدفعة'],\n  needs_second_approval: ['Second approval needed', 'مطلوب موافقة ثانية'],\n  bank_change_pending: ['Vendor bank details changed: waiting period started', 'تغيير بيانات بنك المورد: بدأت فترة الانتظار'],\n};\nconst clean = (s) => String(s).replace(/[\\u0000-\\u001f]/g, ' ').slice(0, 120);\nconst html = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\nconst e = $input.first().json.event;\nconst base = (env('APP_BASE_URL') || 'http://localhost:3000').replace(/\\/+$/, '');\nconst vendor = e.event_type === 'bank_change_pending';\nconst link = vendor ? `${base}/vendors/${e.vendor_id}` : `${base}/payments/${e.payment_request_id}`;\nconst ref = vendor ? `Vendor #${e.vendor_id}` : `Payment request #${e.payment_request_id}`;\nconst reasons = (Array.isArray(e.reasons) ? e.reasons : []).slice(0, 3).map(clean);\nconst [en, ar] = TEXT[e.event_type];\nconst lines = [\n  `${ar}`, `${en}`, '', ref,\n  ...(reasons.length ? ['Top reasons / أهم الأسباب:', ...reasons.map((r, i) => `${i + 1}. ${r}`)] : []),\n  ...(e.expires_at ? [`Until / حتى: ${clean(e.expires_at)}`] : []),\n  '', `Open in SecureFin / افتح في التطبيق: ${link}`,\n];\nconst plain = lines.join('\\n');  // email text; Telegram gets the same lines HTML-escaped\nreturn [{ json: { event_id: e.event_id, subject: `SecureFin: ${en} (${ref})`, plain, text: html(plain) } }];"
       },
       "id": "b9",
       "name": "Build message",
@@ -159,6 +233,53 @@
       "position": [
         1540,
         -80
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $('Test form').isExecuted }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "b14",
+      "name": "Started from test form?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1760,
+        -80
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "completion",
+        "respondWith": "text",
+        "completionTitle": "This is the message the approver would get",
+        "completionMessage": "={{ $json.text.replace(/\\n/g, '<br>') }}",
+        "options": {}
+      },
+      "id": "b15",
+      "name": "Show result on screen",
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 2.5,
+      "position": [
+        1980,
+        -180
       ]
     },
     {
@@ -176,8 +297,8 @@
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
       "position": [
-        1760,
-        -80
+        1980,
+        20
       ],
       "credentials": {
         "telegramApi": {
@@ -206,8 +327,8 @@
       "type": "n8n-nodes-base.emailSend",
       "typeVersion": 2.1,
       "position": [
-        1980,
-        20
+        2200,
+        120
       ],
       "credentials": {
         "smtp": {
@@ -306,6 +427,24 @@
       "main": [
         [
           {
+            "node": "Started from test form?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Started from test form?": {
+      "main": [
+        [
+          {
+            "node": "Show result on screen",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
             "node": "Telegram",
             "type": "main",
             "index": 0
@@ -319,6 +458,28 @@
         [
           {
             "node": "Email fallback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Test form": {
+      "main": [
+        [
+          {
+            "node": "Form to event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Form to event": {
+      "main": [
+        [
+          {
+            "node": "Build message",
             "type": "main",
             "index": 0
           }

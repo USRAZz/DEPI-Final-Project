@@ -4,6 +4,45 @@
   "nodes": [
     {
       "parameters": {
+        "formTitle": "Test 1: invoice intake",
+        "formDescription": "Upload any invoice file from the project (for example tests/fixtures/synthetic/clear_invoices_20/STRESS3-001.pdf). The workflow hashes it, names it by its SHA-256 and shows the message it would send. Nothing is stored or sent.",
+        "formFields": {
+          "values": [
+            {
+              "fieldName": "invoice_file",
+              "fieldLabel": "Invoice file (PDF or image)",
+              "fieldType": "file",
+              "requiredField": true,
+              "multipleFiles": false,
+              "acceptFileTypes": ".pdf, .png, .jpg, .jpeg, .webp, .tif, .tiff"
+            },
+            {
+              "fieldName": "sender_email",
+              "fieldLabel": "Sender email (any address)",
+              "fieldType": "email",
+              "requiredField": true,
+              "defaultValue": "supplier@example.com"
+            }
+          ]
+        },
+        "responseMode": "onReceived",
+        "options": {
+          "path": "securefin-test-intake",
+          "buttonLabel": "Run"
+        }
+      },
+      "id": "a0",
+      "name": "Test form",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.4,
+      "position": [
+        0,
+        220
+      ],
+      "webhookId": "securefin-test-intake"
+    },
+    {
+      "parameters": {
         "mailbox": "INBOX",
         "postProcessAction": "read",
         "downloadAttachments": true,
@@ -29,7 +68,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// One item per invoice attachment. The type comes from the MIME type the mail client declared; the API\n// checks the real file bytes and enforces the size limit (413), so there is one limit, in one place.\nconst EXT = { 'application/pdf': 'pdf', 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp', 'image/tiff': 'tif' };\nconst MAX_PER_EMAIL = 5;\nconst out = [];\nfor (const item of $input.all()) {\n  const j = item.json;\n  const from = typeof j.from === 'string' ? j.from : (j.from?.value?.[0]?.address ?? '');\n  const sender = (from.match(/[^\\s<>\"]+@[^\\s<>\"]+/) ?? [''])[0].toLowerCase();\n  // Message-ID is chosen by the sender, so it is only ever used hashed (see \"Idempotency key\").\n  const messageId = String(j.messageId ?? j.metadata?.['message-id'] ?? `uid-${j.attributes?.uid ?? ''}`);\n  let kept = 0;\n  for (const bin of Object.values(item.binary ?? {})) {\n    const ext = EXT[(bin.mimeType ?? '').toLowerCase()];\n    if (!ext || kept >= MAX_PER_EMAIL) continue;\n    kept += 1;\n    out.push({ json: { sender, message_id: messageId, ext }, binary: { file: bin } });\n  }\n}\nreturn out;"
+        "jsCode": "// One item per invoice attachment. The type comes from the MIME type the mail client declared; the API\n// checks the real file bytes and enforces the size limit (413), so there is one limit, in one place.\nconst EXT = { 'application/pdf': 'pdf', 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp', 'image/tiff': 'tif' };\nconst MAX_PER_EMAIL = 5;\nconst out = [];\nfor (const item of $input.all()) {\n  const j = item.json;\n  const from = typeof j.from === 'string' ? j.from : (j.from?.value?.[0]?.address ?? j.sender_email ?? '');  // sender_email: test form\n  const sender = (from.match(/[^\\s<>\"]+@[^\\s<>\"]+/) ?? [''])[0].toLowerCase();\n  // Message-ID is chosen by the sender, so it is only ever used hashed (see \"Idempotency key\").\n  const messageId = String(j.messageId ?? j.metadata?.['message-id'] ?? `uid-${j.attributes?.uid ?? ''}`);\n  let kept = 0;\n  for (const bin of Object.values(item.binary ?? {})) {\n    const ext = EXT[(bin.mimeType ?? '').toLowerCase()];\n    if (!ext || kept >= MAX_PER_EMAIL) continue;\n    kept += 1;\n    out.push({ json: { sender, message_id: messageId, ext }, binary: { file: bin } });\n  }\n}\nreturn out;"
       },
       "id": "a2",
       "name": "Keep invoice attachments",
@@ -77,7 +116,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Arabic file names arrive garbled and are sender-controlled: the file is named after its own hash.\n// The hash nodes pass on JSON only, so the file is taken again from the node that split the attachments.\nconst source = $('Keep invoice attachments').all();\nreturn $input.all().map((item, i) => ({\n  json: item.json,\n  binary: { file: { ...source[i].binary.file, fileName: `${item.json.sha256}.${item.json.ext}` } },\n  pairedItem: i,\n}));"
+        "jsCode": "const env = (k) => { try { return String($env[k] ?? ''); } catch (e) { return ''; } };  // '' when unset or blocked\n// Arabic file names arrive garbled and are sender-controlled: the file is named after its own hash.\n// The hash nodes pass on JSON only, so the file is taken again from the node that split the attachments.\nconst source = $('Keep invoice attachments').all();\nconst api_connected = env('N8N_INVOICE_UPLOAD_URL') !== '';\nreturn $input.all().map((item, i) => ({\n  json: { ...item.json, api_connected },\n  binary: { file: { ...source[i].binary.file, fileName: `${item.json.sha256}.${item.json.ext}` } },\n  pairedItem: i,\n}));"
       },
       "id": "a5",
       "name": "Name file by hash",
@@ -158,11 +197,11 @@
           },
           "conditions": [
             {
-              "leftValue": "={{ $env.N8N_INVOICE_UPLOAD_URL }}",
+              "leftValue": "={{ $json.api_connected }}",
               "rightValue": "",
               "operator": {
-                "type": "string",
-                "operation": "notEmpty",
+                "type": "boolean",
+                "operation": "true",
                 "singleValue": true
               }
             }
@@ -183,7 +222,7 @@
       "parameters": {
         "operation": "removeItemsSeenInPreviousExecutions",
         "logic": "removeItemsWithAlreadySeenKeyValues",
-        "dedupeValue": "={{ $json.sha256 }}",
+        "dedupeValue": "={{ $('Test form').isExecuted ? 'form-' + $execution.id : $json.sha256 }}",
         "options": {
           "scope": "node",
           "historySize": 10000
@@ -213,6 +252,53 @@
     },
     {
       "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $('Test form').isExecuted }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "a14",
+      "name": "Started from test form?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1760,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "completion",
+        "respondWith": "text",
+        "completionTitle": "Invoice received: this is the message the team would get",
+        "completionMessage": "={{ $json.text.replace(/\\n/g, '<br>') }}",
+        "options": {}
+      },
+      "id": "a15",
+      "name": "Show result on screen",
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 2.5,
+      "position": [
+        1980,
+        160
+      ]
+    },
+    {
+      "parameters": {
         "chatId": "={{ $env.TELEGRAM_CHAT_ID }}",
         "text": "={{ $json.text }}",
         "additionalFields": {
@@ -226,8 +312,8 @@
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
       "position": [
-        1760,
-        260
+        1980,
+        360
       ],
       "credentials": {
         "telegramApi": {
@@ -256,8 +342,8 @@
       "type": "n8n-nodes-base.emailSend",
       "typeVersion": 2.1,
       "position": [
-        1980,
-        360
+        2200,
+        460
       ],
       "credentials": {
         "smtp": {
@@ -382,6 +468,24 @@
       "main": [
         [
           {
+            "node": "Started from test form?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Started from test form?": {
+      "main": [
+        [
+          {
+            "node": "Show result on screen",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
             "node": "Tell the team",
             "type": "main",
             "index": 0
@@ -395,6 +499,17 @@
         [
           {
             "node": "Email fallback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Test form": {
+      "main": [
+        [
+          {
+            "node": "Keep invoice attachments",
             "type": "main",
             "index": 0
           }
