@@ -14,7 +14,14 @@ load_dotenv()
 
 # Decision (SecureFin plan 1.2): OpenAI only. Every message is masked (ai_core.privacy) before it is sent.
 PROVIDERS = {
-    "openai": {"base_url": None, "key_env": "OPENAI_API_KEY"},
+    "openai": {
+        "base_url": None,
+        "key_env": "OPENAI_API_KEY",
+    },
+    "openrouter": {
+        "base_url": "https://openrouter.ai/api/v1",
+        "key_env": "OPENROUTER_API_KEY",
+    },
 }
 
 
