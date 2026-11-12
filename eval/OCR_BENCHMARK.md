@@ -195,3 +195,16 @@ QARI alone is worse than PaddleOCR (254/518) and invents plausible words (`خد�
 | + QARI second reading | **1,985/2,032 (97.7%)** | **184/228** | 41/130 | 10.9 s per re-read page (~3.4 s/page on average) |
 
 No non-description field changed. Off by default because it adds torch + transformers and a 4.5 GB model to the extractor, needs a GPU to be practical, and the downstream LLM extraction has not yet been measured on text that contains a second, possibly wrong, reading. Precision of the extracted fields must be checked before turning it on.
+
+**Does the QARI reading help the LLM extraction? (2026-11-13).** The real `pipeline.process_invoice` (masking, extractor prompt, checks) was run on the 41 pages where QARI runs, once with the PaddleOCR text and once with the QARI block added. The extractor LLM was a local `qwen3:8b` through Ollama's OpenAI-compatible endpoint (the project `.env` has no OpenAI key or model yet), so absolute numbers are not the production model's. Gate threshold 0.85 was also tried: 1,986 vs 1,985 field hits but QARI on 54 pages instead of 41, so `REREAD_SCORE` stays 0.8.
+
+| Extracted field (41 pages) | PaddleOCR text | + QARI block |
+|---|---:|---:|
+| Line descriptions | 59/106 | **71/106** |
+| Date / invoice number | 40/41, 40/41 | 41/41, 41/41 |
+| Line totals / total / tax | 104/106, 41/41, 37/41 | 104/106, 41/41, 37/41 |
+| Subtotal | 41/41 | 40/41 |
+| Vendor | 28/41 | 25/41 |
+| All | 390/458 | **400/458** |
+
+Descriptions gain clearly. The vendor changes go both ways (4 won, 7 lost) although the QARI block covers only the table and holds no vendor text, and the same invoice gave different losses on two runs (STRESS-004: tax in one, vendor and subtotal in the other), so these look like run-to-run variation of the local model, not QARI misleading it. Before turning `OCR_ARABIC_REREAD=qari` on, repeat this with the production extractor model and run each variant at least twice to measure that variation. Scripts: `extract_eval.py`, `cache_qari.py`, `full_check.py` (kept outside the repo).
