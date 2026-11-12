@@ -176,3 +176,22 @@ Every field outside the item table now matches on all 130 invoices. The 63 remai
 | Local vision LLM via Ollama: gemma4:e4b, qwen3.8 | gemma: "no Arabic text"; qwen3.8 read `خدمة صيانة` as `خدمة عمولة` (invented a plausible word) | 52 s/line |
 
 Only `arabic_PP-OCRv5_mobile_rec` exists for Arabic in PaddleOCR (no server model). Candidates not tried (need multi-GB downloads): QARI-OCR (Qwen2-VL-2B fine-tuned on degraded Arabic) and PaddleOCR-VL. A VLM that guesses words is risky for amounts and names; if tried, use it only for descriptions and keep the PaddleOCR reading next to it.
+
+**QARI-OCR second reading (2026-11-12, opt-in `OCR_ARABIC_REREAD=qari`).** [QARI-OCR v0.3](https://huggingface.co/NAMAA-Space/Qari-OCR-v0.3-VL-2B-Instruct) is Qwen2-VL-2B fine-tuned on degraded Arabic print. Run on an RTX 5070 Ti (fp16).
+
+| QARI setup (26 pages with description misses) | All fields | Arabic descriptions | Notes |
+|---|---:|---:|---|
+| PaddleOCR only | 455/518 | 11/71 | |
+| QARI per table line, replacing Paddle | 39/46 on 2 pages, no gain | 0/7 | single lines are out of its training: HTML tags, Chinese, prompt echoed |
+| QARI on the whole table region, 300 dpi render | 54/63 on 3 pages, no gain | 0/9 | skipped the description column |
+| QARI on the whole table region, embedded scan, text **added** after Paddle's | 475/518 | 30/71 | +1 amount came from QARI |
+| Same, QARI amount tokens dropped (adopted) | 474/518 | 30/71 | all gains are descriptions |
+
+QARI alone is worse than PaddleOCR (254/518) and invents plausible words (`خدمة مالية` for `خدمة معايرة`, `اللبنان` for `البيان`), so it never replaces PaddleOCR. The service adds its reading after a marker line (`REREAD_MARKER`), with amounts removed, so every number still comes from PaddleOCR. It runs only when the weakest Arabic line below the header scored under `REREAD_SCORE` = 0.8 (catches 21 of the 26 bad pages; mean score would catch 11).
+
+| All 130 invoices (cached PaddleOCR output, identical to the fresh service run, + the real `needs_reread` / `qari_table_lines`) | Field hits | Descriptions | QARI pages | Extra time |
+|---|---:|---:|---:|---:|
+| PaddleOCR (default) | 1,969/2,032 (96.9%) | 168/228 | 0 | 0 |
+| + QARI second reading | **1,985/2,032 (97.7%)** | **184/228** | 41/130 | 10.9 s per re-read page (~3.4 s/page on average) |
+
+No non-description field changed. Off by default because it adds torch + transformers and a 4.5 GB model to the extractor, needs a GPU to be practical, and the downstream LLM extraction has not yet been measured on text that contains a second, possibly wrong, reading. Precision of the extracted fields must be checked before turning it on.

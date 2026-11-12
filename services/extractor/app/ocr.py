@@ -191,12 +191,58 @@ def _paddle_text(full_pl: list[dict], head_pl: list[dict], en_pl: list[dict], pa
     return [fix_numbers(line) for line in lines]
 
 
+# Opt-in second reading of the item table with QARI-OCR (Qwen2-VL-2B fine-tuned on degraded Arabic print),
+# eval/OCR_BENCHMARK.md: on the 26 low-resolution pages, Arabic descriptions 11/71 -> 30/71. It sometimes
+# invents a plausible word, so its text is only ADDED under REREAD_MARKER (never replaces PaddleOCR) and its
+# amounts are dropped: numbers always come from PaddleOCR. Needs torch + transformers and a GPU for speed.
+QARI_MODEL = os.getenv("OCR_QARI_MODEL", "NAMAA-Space/Qari-OCR-v0.3-VL-2B-Instruct")
+REREAD_SCORE = 0.8  # re-read when the weakest Arabic table line scored below this (21/26 bad pages, 20/104 others)
+REREAD_MARKER = "--- second reading of the item table (QARI-OCR, Arabic words only, may contain errors) ---"
+_QARI_PROMPT = ("Below is the image of one page of a document, as well as some raw textual content that was "
+                "previously extracted for it. Just return the plain text representation of this document as if you "
+                "were reading it naturally. Do not hallucinate.")
+_AMOUNT = re.compile(r"[\d.,%:/\-]+|ج\.م")
+
+
+def needs_reread(full_pl: list[dict], page_height: float) -> bool:
+    scores = [s for t, b, s in _entries(full_pl) or []
+              if (b[1] + b[3]) / 2 >= page_height * HEADER_FRACTION and _is_ar(t)]
+    return bool(scores) and min(scores) < REREAD_SCORE
+
+
+@lru_cache(maxsize=1)
+def _qari_model():
+    import torch  # heavy and optional: only when OCR_ARABIC_REREAD=qari
+    from transformers import AutoProcessor, Qwen2VLForConditionalGeneration
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    model = Qwen2VLForConditionalGeneration.from_pretrained(
+        QARI_MODEL, torch_dtype=torch.float16 if device == "cuda" else torch.float32, device_map=device)
+    return model, AutoProcessor.from_pretrained(QARI_MODEL), device
+
+
+def qari_table_lines(img) -> list[str]:
+    """QARI reading of the page below the header, tags and amount tokens removed."""
+    import torch
+    model, proc, device = _qari_model()
+    body = img.crop((0, int(img.height * HEADER_FRACTION), img.width, img.height))
+    msgs = [{"role": "user", "content": [{"type": "image"}, {"type": "text", "text": _QARI_PROMPT}]}]
+    prompt = proc.apply_chat_template(msgs, tokenize=False, add_generation_prompt=True)
+    inputs = proc(text=[prompt], images=[body], return_tensors="pt").to(device)
+    with torch.no_grad():
+        out = model.generate(**inputs, max_new_tokens=700, do_sample=False, repetition_penalty=1.05)
+    text = re.sub(r"<[^>]+>", " ", proc.batch_decode(out[:, inputs.input_ids.shape[1]:], skip_special_tokens=True)[0])
+    lines = (" ".join(w for w in line.split() if not _AMOUNT.fullmatch(w)) for line in text.splitlines())
+    return [line for line in lines if line]
+
+
 def _paddle(img) -> tuple[str, float | None]:
     ar = _paddle_model("ar")
     full_pl = _paddle_payloads(ar, img)
     head_pl = _paddle_payloads(ar, _header_image(img))
     en_pl = _paddle_payloads(_paddle_model("en"), img)
     lines = _paddle_text(full_pl, head_pl, en_pl, img.height)
+    if os.getenv("OCR_ARABIC_REREAD", "") == "qari" and needs_reread(full_pl, img.height):
+        lines += [REREAD_MARKER, *qari_table_lines(img)]
     scores = [float(s) for p in full_pl + en_pl for s in p.get("rec_scores", [])]  # full-page passes only
     return "\n".join(lines), (round(sum(scores) / len(scores), 3) if scores else None)
 
