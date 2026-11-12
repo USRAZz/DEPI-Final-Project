@@ -1,7 +1,7 @@
 """Database access for the gateway's own tables (approvals, audit_log; GitHub issue #15).
 
 Every transaction runs as role securefin_gateway with app.company_id set, so row-level security applies and
-the gateway can only SELECT/INSERT these two tables (see services/api/migrations/versions/0001). The session
+the gateway can only SELECT/INSERT these two tables (see services/api/migrations/versions/0002_tenant_security.py). The session
 time zone is UTC so timestamps read back exactly as they were signed and hashed.
 """
 import os

@@ -35,7 +35,7 @@ from .schemas import (
     PaymentRequestView,
     PendingRow,
 )
-from .store import Store
+from .store import DataStore
 
 router = APIRouter()
 
@@ -54,11 +54,11 @@ def _not_found(what: str) -> HTTPException:
     return HTTPException(status.HTTP_404_NOT_FOUND, f"{what} not found")
 
 
-def _account_view(store: Store, account: BankAccount) -> AccountView:
-    return AccountView(**account.model_dump(), times_paid=store.times_paid.get(account.id, 0))
+def _account_view(store: DataStore, account: BankAccount) -> AccountView:
+    return AccountView(**account.model_dump(), times_paid=store.times_paid(account.id))
 
 
-def _verified_account(store: Store, request: PaymentRecord) -> BankAccount:
+def _verified_account(store: DataStore, request: PaymentRecord) -> BankAccount:
     # The account must still be verified: the payment goes to this exact account.
     account = store.bank_account(request.bank_account_id, request.company_id)
     if account is None or account.status != BankAccountStatus.VERIFIED:
@@ -66,8 +66,8 @@ def _verified_account(store: Store, request: PaymentRecord) -> BankAccount:
     return account
 
 
-def _approval_state(store: Store, request: PaymentRecord) -> ApprovalState:
-    result = store.approval_results.get(request.id)
+def _approval_state(store: DataStore, request: PaymentRecord) -> ApprovalState:
+    result = store.approval_result(request.id)
     if result is not None:
         return ApprovalState(status=result.status, approvals_received=result.approvals_received,
                              approvals_required=result.approvals_required, reasons=result.reasons)
@@ -108,9 +108,9 @@ def dashboard(user: UserDep, store: StoreDep) -> DashboardView:
         pending=[
             PendingRow(
                 request=p,
-                vendor=store.vendors[p.vendor_id],
-                created_by=store.users[p.creator_id],
-                risk=store.risk.get(p.id),
+                vendor=store.vendor(p.vendor_id, p.company_id),
+                created_by=store.user(p.creator_id),
+                risk=store.risk(p.id),
             )
             for p in pending
         ],
@@ -125,20 +125,20 @@ def get_invoice(invoice_id: int, user: UserDep, store: StoreDep) -> Invoice:
     return invoice
 
 
-def _payment_view(request: PaymentRecord, store: Store) -> PaymentRequestView:
+def _payment_view(request: PaymentRecord, store: DataStore) -> PaymentRequestView:
     account = store.bank_account(request.bank_account_id, request.company_id)
     if account is None:
         raise _not_found("bank account")
     return PaymentRequestView(
         request=request,
-        vendor=store.vendors[request.vendor_id],
+        vendor=store.vendor(request.vendor_id, request.company_id),
         account=_account_view(store, account),
-        created_by=store.users[request.creator_id],
-        risk=store.risk.get(request.id),
+        created_by=store.user(request.creator_id),
+        risk=store.risk(request.id),
         approval=_approval_state(store, request),
         approvals=[
-            ApprovalView(approver=store.users[e.approver_id], approved=e.approve, at=e.at)
-            for e in store.approvals.get(request.id, [])
+            ApprovalView(approver=store.user(e.approver_id), approved=e.approve, at=e.at)
+            for e in store.approvals(request.id)
         ],
     )
 
@@ -146,7 +146,7 @@ def _payment_view(request: PaymentRecord, store: Store) -> PaymentRequestView:
 @router.get("/payments/{request_id}", dependencies=[Depends(require_service_token)], include_in_schema=False)
 def get_payment_info(request_id: int, store: StoreDep) -> PaymentRequestInfo:
     """Service-to-service read for the gateway (approvals and execute-check). Needs X-Service-Token."""
-    request = store.payment_requests.get(request_id)
+    request = store.payment_request_by_id(request_id)
     if request is None:
         raise _not_found("payment request")
     return request.info()
@@ -187,7 +187,7 @@ def decide_payment_request(
     # APPROVED keeps PENDING_APPROVAL: execute-check only allows a payment in that status.
     if result.status == ApprovalStatus.REJECTED:
         store.set_request_status(request.id, InvoiceStatus.REJECTED)
-    return _payment_view(store.payment_requests[request.id], store)
+    return _payment_view(store.payment_request_by_id(request.id), store)
 
 
 @router.post("/payment-requests/{request_id}/execute")
@@ -200,7 +200,7 @@ def execute_payment_request(request_id: int, user: UserDep, store: StoreDep, gat
         raise HTTPException(status.HTTP_403_FORBIDDEN, ["your role cannot execute payments"])
     if request.status != InvoiceStatus.PENDING_APPROVAL:
         raise HTTPException(status.HTTP_409_CONFLICT, [f"request is {request.status.value}, not awaiting execution"])
-    account = _verified_account(store, request)
+    _verified_account(store, request)
 
     check = ExecuteCheckRequest(payment_request_id=request.id, requested_by=user.id, company_id=user.company_id)
     try:
@@ -212,9 +212,7 @@ def execute_payment_request(request_id: int, user: UserDep, store: StoreDep, gat
     if not result.allowed:
         raise HTTPException(status.HTTP_409_CONFLICT, result.reasons or ["gateway did not allow execution"])
 
-    store.set_request_status(request.id, InvoiceStatus.PAID_SIMULATED)
-    store.times_paid[account.id] = store.times_paid.get(account.id, 0) + 1
-    return ExecutionView(request=store.payment_requests[request.id], executed=True)
+    return ExecutionView(request=store.mark_paid(request.id), executed=True)
 
 
 @router.get("/vendors/{vendor_id}/bank-change")
@@ -225,10 +223,9 @@ def bank_change(vendor_id: int, user: UserDep, store: StoreDep) -> BankChangeVie
     accounts = store.vendor_accounts(vendor_id, user.company_id)
     current = next((a for a in accounts if a.status == BankAccountStatus.VERIFIED), None)
     proposed = next((a for a in accounts if a.status == BankAccountStatus.ON_HOLD), None)
-    requested_by = store.bank_change_requested_by.get(vendor_id)
     return BankChangeView(
         vendor=vendor,
         current=_account_view(store, current) if current else None,
         proposed=_account_view(store, proposed) if proposed else None,
-        requested_by=store.users.get(requested_by) if requested_by else None,
+        requested_by=store.bank_change_requester(vendor_id),
     )

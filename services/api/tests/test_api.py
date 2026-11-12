@@ -1,3 +1,4 @@
+import os
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -21,12 +22,18 @@ from app.store import (
 )
 from fastapi.testclient import TestClient
 from securefin_contracts import ApprovalRequest, ApprovalResult, BankAccountStatus, ExecuteCheckRequest
-from tests.fakes import DownGateway, FakeGateway
+from tests.fakes import DownGateway, FakeGateway, sql_store_with_sample_data
+
+POSTGRES_URL = os.environ.get("TEST_DATABASE_URL")  # a throwaway PostgreSQL: its tables are dropped
 
 
-@pytest.fixture
-def store():
-    return seeded_store()
+@pytest.fixture(params=["memory", "sqlite", pytest.param("postgres", marks=pytest.mark.skipif(
+    not POSTGRES_URL, reason="set TEST_DATABASE_URL to also run on PostgreSQL"))])
+def store(request):
+    """Every api test runs on each store, so the database one behaves exactly like the in-memory one."""
+    if request.param == "memory":
+        return seeded_store()
+    return sql_store_with_sample_data(POSTGRES_URL if request.param == "postgres" else None)
 
 
 @pytest.fixture
@@ -151,8 +158,8 @@ class TestApprovals:
         assert body["approvals"] == []
 
     def test_cannot_approve_payment_to_unverified_account(self, client, store, gateway):
-        account_id = store.payment_requests[PR_188].bank_account_id
-        store.bank_accounts[account_id] = store.bank_accounts[account_id].model_copy(update={"status": BankAccountStatus.ON_HOLD})
+        account_id = store.payment_request_by_id(PR_188).bank_account_id
+        store.set_account_status(account_id, BankAccountStatus.ON_HOLD)
         res = approve(client, PR_188, MONA)
         assert res.status_code == 409 and "not verified" in res.json()["detail"]
         assert gateway.sent == []
@@ -167,14 +174,14 @@ class TestExecution:
         assert res.json()["executed"] is True
         assert res.json()["request"]["status"] == "PAID_SIMULATED"
         assert gateway.sent[-1] == ExecuteCheckRequest(payment_request_id=PR_187, requested_by=SARA, company_id=1)
-        assert store.times_paid[ACC_NILE] == 10
+        assert store.times_paid(ACC_NILE) == 10
 
     def test_not_enough_approvals_is_refused_and_nothing_is_paid(self, client, store):
         approve(client, PR_187, MONA)
         res = execute(client, PR_187, SARA)
         assert res.status_code == 409
         assert res.json()["detail"] == ["1 valid approval(s), 2 required"]
-        assert store.payment_requests[PR_187].status == "PENDING_APPROVAL"
+        assert store.payment_request_by_id(PR_187).status == "PENDING_APPROVAL"
 
     def test_cannot_pay_twice(self, client):
         approve(client, PR_189, MONA)
@@ -189,8 +196,8 @@ class TestExecution:
 
     def test_account_put_on_hold_after_approval_blocks_payment(self, client, store, gateway):
         approve(client, PR_189, MONA)
-        account_id = store.payment_requests[PR_189].bank_account_id
-        store.bank_accounts[account_id] = store.bank_accounts[account_id].model_copy(update={"status": BankAccountStatus.ON_HOLD})
+        account_id = store.payment_request_by_id(PR_189).bank_account_id
+        store.set_account_status(account_id, BankAccountStatus.ON_HOLD)
         assert execute(client, PR_189, SARA).status_code == 409
         assert not any(isinstance(s, ExecuteCheckRequest) for s in gateway.sent)
 
@@ -203,13 +210,13 @@ class TestFailClosed:
     def test_approval_fails_when_gateway_down(self, client, store):
         res = approve(client, PR_187, MONA)
         assert res.status_code == 503 and res.json()["detail"] == ["gateway unavailable: nothing was approved"]
-        assert store.payment_requests[PR_187].status == "PENDING_APPROVAL"
-        assert store.approvals == {}
+        assert store.payment_request_by_id(PR_187).status == "PENDING_APPROVAL"
+        assert store.approvals(PR_187) == []
 
     def test_payment_fails_when_gateway_down(self, client, store):
         res = execute(client, PR_189, SARA)
         assert res.status_code == 503 and res.json()["detail"] == ["gateway unavailable: nothing was paid"]
-        assert store.payment_requests[PR_189].status == "PENDING_APPROVAL"
+        assert store.payment_request_by_id(PR_189).status == "PENDING_APPROVAL"
 
 
 def test_bank_change_view(client):
@@ -228,15 +235,15 @@ class TestPaymentInfoForGateway:
     def test_returns_payment_request_info(self, client, store):
         res = client.get(f"/payments/{PR_187}", headers={"X-Service-Token": "test-service-token"})
         assert res.status_code == 200
-        created_at = store.payment_requests[PR_187].created_at.isoformat().replace("+00:00", "Z")
+        created_at = store.payment_request_by_id(PR_187).created_at.isoformat().replace("+00:00", "Z")
         assert res.json() == {
             "id": PR_187, "company_id": 1, "creator_id": SARA, "invoice_id": INV_0412, "vendor_id": 1,
             "amount": "15400.00", "currency": "EGP", "status": "PENDING_APPROVAL", "created_at": created_at,
         }
 
-    def test_sample_requests_are_inside_the_gateways_72_hour_window(self, store):
+    def test_sample_requests_are_inside_the_gateways_72_hour_window(self):
         now = datetime.now(UTC)
-        assert all(now - p.created_at < timedelta(hours=72) for p in store.payment_requests.values())
+        assert all(now - p.created_at < timedelta(hours=72) for p in seeded_store().payment_requests.values())
 
     def test_unknown_payment_is_404(self, client):
         assert client.get("/payments/9999", headers={"X-Service-Token": "test-service-token"}).status_code == 404
@@ -244,3 +251,17 @@ class TestPaymentInfoForGateway:
     @pytest.mark.parametrize("headers", [{}, {"X-Service-Token": "wrong"}, as_user(KARIM)])
     def test_needs_the_service_token(self, client, headers):
         assert client.get(f"/payments/{PR_187}", headers=headers).status_code == 401
+
+
+class TestDeployment:
+    def test_dev_login_is_off_on_vercel_unless_asked_for(self, client, monkeypatch):
+        monkeypatch.setenv("VERCEL", "1")
+        assert client.get("/me", headers=as_user(KARIM)).status_code == 401
+        monkeypatch.setenv("DEV_LOGIN", "1")
+        assert client.get("/me", headers=as_user(KARIM)).status_code == 200
+
+    @pytest.mark.parametrize("url", ["postgres://u:p@host/db?sslmode=require", "postgresql://u:p@host/db?sslmode=require",
+                                     "postgresql+psycopg://u:p@host/db?sslmode=require"])
+    def test_database_urls_get_the_psycopg_driver(self, url):
+        from app.db import normalize_url
+        assert normalize_url(url) == "postgresql+psycopg://u:p@host/db?sslmode=require"

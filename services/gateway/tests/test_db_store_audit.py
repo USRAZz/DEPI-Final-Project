@@ -1,4 +1,4 @@
-"""Approvals and audit_log in PostgreSQL through role securefin_gateway (migration 0001, issues #15 and #16).
+"""Approvals and audit_log in PostgreSQL through role securefin_gateway (migrations 0001 + 0002, issues #15 and #16).
 Skipped unless TEST_DATABASE_URL points at an EMPTY database (the test upgrades and downgrades it)."""
 import os
 from datetime import UTC, datetime
@@ -23,14 +23,20 @@ def engine():
     command.upgrade(cfg, "head")
     eng = create_engine(URL)
     with eng.begin() as c:  # superuser seeds what the api would own
-        c.execute(text("INSERT INTO companies (name) VALUES ('A'), ('B')"))
-        c.execute(text("INSERT INTO users (company_id, email, role) VALUES (1, 'm@a.eg', 'accountant'), "
-                       "(1, 'b@a.eg', 'approver'), (2, 'x@b.eg', 'approver')"))
-        c.execute(text("INSERT INTO vendors (company_id, name) VALUES (1, 'Nile')"))
-        c.execute(text("INSERT INTO invoices (company_id, vendor_id, source_key, source_hash, source_mime, source_size) "
-                       "VALUES (1, 1, 'k', repeat('a', 64), 'application/pdf', 10)"))
-        c.execute(text("INSERT INTO payment_requests (company_id, invoice_id, vendor_id, created_by, amount, request_hash) "
-                       "VALUES (1, 1, 1, 1, 1500, repeat('b', 64))"))
+        c.execute(text("""
+            INSERT INTO companies (name, default_language, created_at) VALUES ('A', 'ar', now()), ('B', 'en', now());
+            INSERT INTO users (company_id, email, full_name, role, language, is_active, created_at) VALUES
+                (1, 'm@a.eg', 'M', 'accountant', 'ar', true, now()), (1, 'b@a.eg', 'B', 'approver', 'ar', true, now()),
+                (2, 'x@b.eg', 'X', 'approver', 'en', true, now());
+            INSERT INTO vendors (company_id, name, created_at) VALUES (1, 'Nile', now());
+            INSERT INTO bank_accounts (company_id, vendor_id, bank_name, iban, status, times_paid, created_at)
+                VALUES (1, 1, 'NBE', 'EG380019000500000000263180002', 'verified', 0, now());
+            INSERT INTO invoices (company_id, vendor_id, source, status, file_key, created_at, extraction_issues)
+                VALUES (1, 1, 'upload', 'VALIDATED', 'k', now(), '[]');
+            INSERT INTO payment_requests (company_id, invoice_id, vendor_id, bank_account_id, creator_id, amount,
+                                          currency, status, note, created_at)
+                VALUES (1, 1, 1, 1, 1, 1500, 'EGP', 'PENDING_APPROVAL', '', now());
+        """))
     yield eng
     eng.dispose()
     command.downgrade(cfg, "base")
@@ -74,7 +80,9 @@ def test_audit_chain_survives_the_database_and_detects_edits(engine):
     log.append(AuditEvent(user_id=3, company_id=2, action="approval", source_service="gateway"))
     assert log.verify(1) is None and log.verify(2) is None
     assert log.entries(2)[0].prev_hash == "0" * 64
-    with engine.begin() as c:  # a superuser edits history behind the gateway's back
+    with engine.begin() as c:  # a superuser switches off the append-only trigger and edits history
+        c.execute(text("ALTER TABLE audit_log DISABLE TRIGGER audit_log_append_only"))
         c.execute(text("UPDATE audit_log SET decision = 'BLOCK' WHERE company_id = 1 AND id = "
                        "(SELECT min(id) FROM audit_log WHERE company_id = 1) + 1"))
+        c.execute(text("ALTER TABLE audit_log ENABLE TRIGGER audit_log_append_only"))
     assert log.verify(1) == 1

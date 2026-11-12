@@ -1,0 +1,9 @@
+# Vercel installs from pyproject.toml + uv.lock; requirements*.txt are for Docker and CI only.
+requirements.txt
+requirements-dev.txt
+Dockerfile
+compose.yaml
+tests/
+.venv/
+.pytest_cache/
+**/__pycache__/

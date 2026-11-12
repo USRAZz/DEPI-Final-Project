@@ -1,15 +1,15 @@
-"""In-memory data store with sample data.
+"""The data store the routes use, and an in-memory implementation with sample data.
 
-Stands in for PostgreSQL until the real tables land. Routes only use the methods
-here, so swapping in a database-backed store changes this file only. Every lookup
-takes the caller's company_id: a record from another company is "not found", never
-"forbidden", so its existence does not leak.
+DataStore is the interface; Store keeps everything in memory (local runs without a
+database, and fast tests) and SqlStore in sql_store.py keeps it in PostgreSQL.
+Every company-facing lookup takes the caller's company_id: a record from another
+company is "not found", never "forbidden", so its existence does not leak.
 """
 
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
-from typing import TypeVar
+from typing import Protocol, TypeVar
 
 from securefin_contracts import (
     ApprovalResult,
@@ -53,25 +53,70 @@ class ApprovalEntry:
     at: datetime
 
 
+class DataStore(Protocol):
+    def user(self, user_id: int) -> User | None: ...
+    def vendor(self, vendor_id: int, company_id: int) -> Vendor | None: ...
+    def invoice(self, invoice_id: int, company_id: int) -> Invoice | None: ...
+    def invoice_by_id(self, invoice_id: int) -> Invoice | None: ...  # trusted internal callers only
+    def payment_request(self, request_id: int, company_id: int) -> PaymentRecord | None: ...
+    def payment_request_by_id(self, request_id: int) -> PaymentRecord | None: ...  # trusted internal callers only
+    def bank_account(self, account_id: int, company_id: int) -> BankAccount | None: ...
+    def vendor_accounts(self, vendor_id: int, company_id: int) -> list[BankAccount]: ...
+    def times_paid(self, account_id: int) -> int: ...
+    def bank_change_requester(self, vendor_id: int) -> User | None: ...
+    def pending_requests(self, company_id: int) -> list[PaymentRecord]: ...
+    def flagged_invoice_count(self, company_id: int) -> int: ...
+    def on_hold_account_count(self, company_id: int) -> int: ...
+    def risk(self, request_id: int) -> RiskScore | None: ...
+    def approvals(self, request_id: int) -> list[ApprovalEntry]: ...
+    def approval_result(self, request_id: int) -> ApprovalResult | None: ...
+    def set_request_status(self, request_id: int, status: InvoiceStatus) -> None: ...
+    def record_approval(self, approver_id: int, approve: bool, result: ApprovalResult) -> None: ...
+    def mark_paid(self, request_id: int) -> PaymentRecord: ...
+    def set_account_status(self, account_id: int, status: BankAccountStatus) -> None: ...
+
+
 @dataclass
 class Store:
     companies: dict[int, Company] = field(default_factory=dict)
     users: dict[int, User] = field(default_factory=dict)
     vendors: dict[int, Vendor] = field(default_factory=dict)
     bank_accounts: dict[int, BankAccount] = field(default_factory=dict)
-    times_paid: dict[int, int] = field(default_factory=dict)
+    paid_counts: dict[int, int] = field(default_factory=dict)
     invoices: dict[int, Invoice] = field(default_factory=dict)
     payment_requests: dict[int, PaymentRecord] = field(default_factory=dict)
-    risk: dict[int, RiskScore] = field(default_factory=dict)
+    risks: dict[int, RiskScore] = field(default_factory=dict)
     bank_change_requested_by: dict[int, int] = field(default_factory=dict)
     # What the gateway answered, kept for the screens: the gateway has no read endpoint for approvals.
-    approvals: dict[int, list[ApprovalEntry]] = field(default_factory=dict)
+    approval_entries: dict[int, list[ApprovalEntry]] = field(default_factory=dict)
     approval_results: dict[int, ApprovalResult] = field(default_factory=dict)
 
-    # -- reads, always scoped to one company ---------------------------------
+    # -- reads -----------------------------------------------------------------
 
     def user(self, user_id: int) -> User | None:
         return self.users.get(user_id)
+
+    def invoice_by_id(self, invoice_id: int) -> Invoice | None:
+        return self.invoices.get(invoice_id)
+
+    def payment_request_by_id(self, request_id: int) -> PaymentRecord | None:
+        return self.payment_requests.get(request_id)
+
+    def times_paid(self, account_id: int) -> int:
+        return self.paid_counts.get(account_id, 0)
+
+    def bank_change_requester(self, vendor_id: int) -> User | None:
+        user_id = self.bank_change_requested_by.get(vendor_id)
+        return self.users.get(user_id) if user_id is not None else None
+
+    def risk(self, request_id: int) -> RiskScore | None:
+        return self.risks.get(request_id)
+
+    def approvals(self, request_id: int) -> list[ApprovalEntry]:
+        return list(self.approval_entries.get(request_id, []))
+
+    def approval_result(self, request_id: int) -> ApprovalResult | None:
+        return self.approval_results.get(request_id)
 
     def _scoped(self, table: dict[int, T], item_id: int, company_id: int) -> T | None:
         item = table.get(item_id)
@@ -112,9 +157,19 @@ class Store:
     def record_approval(self, approver_id: int, approve: bool, result: ApprovalResult) -> None:
         # On EXPIRED the gateway stores nothing, so the screens must not list this approval either.
         if result.status != ApprovalStatus.EXPIRED:
-            self.approvals.setdefault(result.payment_request_id, []).append(
+            self.approval_entries.setdefault(result.payment_request_id, []).append(
                 ApprovalEntry(approver_id=approver_id, approve=approve, at=datetime.now(UTC)))
         self.approval_results[result.payment_request_id] = result
+
+    def mark_paid(self, request_id: int) -> PaymentRecord:
+        """PAID_SIMULATED, and one more payment to that bank account."""
+        self.set_request_status(request_id, InvoiceStatus.PAID_SIMULATED)
+        request = self.payment_requests[request_id]
+        self.paid_counts[request.bank_account_id] = self.times_paid(request.bank_account_id) + 1
+        return request
+
+    def set_account_status(self, account_id: int, status: BankAccountStatus) -> None:
+        self.bank_accounts[account_id] = self.bank_accounts[account_id].model_copy(update={"status": status})
 
 
 def seeded_store() -> Store:
@@ -144,7 +199,7 @@ def seeded_store() -> Store:
                     paid: int, hold_until: datetime | None = None) -> None:
         s.bank_accounts[aid] = BankAccount(id=aid, company_id=DELTA, vendor_id=vendor, bank_name=bank,
                                            iban=iban, status=status, hold_until=hold_until, created_at=created)
-        s.times_paid[aid] = paid
+        s.paid_counts[aid] = paid
 
     add_account(ACC_NILE, NILE, "NBE", "EG380019000500000000263180002", BankAccountStatus.VERIFIED, 9)
     add_account(ACC_EGPACK_OLD, EGPACK, "NBE", "EG430019000500000000263180009", BankAccountStatus.VERIFIED, 14)
@@ -154,6 +209,19 @@ def seeded_store() -> Store:
     add_account(ACC_AMAL, AMAL, "NBE", "EG450019000500000000099112233", BankAccountStatus.VERIFIED, 5)
     s.bank_change_requested_by[EGPACK] = OMAR
 
+    # Every invoice a sample record points to exists, so the same data loads into PostgreSQL
+    # with its foreign keys: 371 is the earlier, paid invoice that 412 duplicates.
+    s.invoices[INV_0371] = Invoice(
+        id=INV_0371, company_id=DELTA, vendor_id=NILE, source=InvoiceSource.UPLOAD,
+        status=InvoiceStatus.PAID_SIMULATED, file_key="invoices/sample/0371.pdf", category="materials",
+        uploaded_by=SARA, created_at=_at("2026-10-12T09:00:00"),
+    )
+    for inv_id, vendor in [(415, EGPACK), (416, CAIRONET), (417, AMAL)]:
+        s.invoices[inv_id] = Invoice(
+            id=inv_id, company_id=DELTA, vendor_id=vendor, source=InvoiceSource.UPLOAD,
+            status=InvoiceStatus.VALIDATED, file_key=f"invoices/sample/0{inv_id}.pdf",
+            uploaded_by=SARA, created_at=_at("2026-11-02T09:00:00"),
+        )
     s.invoices[INV_0412] = Invoice(
         id=INV_0412, company_id=DELTA, vendor_id=NILE, source=InvoiceSource.UPLOAD, status=InvoiceStatus.FLAGGED,
         file_key="invoices/sample/0412.pdf", duplicate_of=INV_0371, category="materials",
@@ -181,7 +249,7 @@ def seeded_store() -> Store:
     add_request(PR_189, CAIRONET, ACC_CAIRONET, 416, "2300.00", OMAR, hours_ago=3)
     add_request(PR_190, AMAL, ACC_AMAL, 417, "12000.00", KARIM, hours_ago=2)
 
-    s.risk[PR_187] = RiskScore(
+    s.risks[PR_187] = RiskScore(
         score=72, level=RiskLevel.HIGH, model_version="rules-0.1",
         rule_hits=["DUPLICATE_INVOICE", "AMOUNT_ABOVE_VENDOR_AVERAGE", "FIRST_PAYMENT_THIS_QUARTER"],
         shap_reasons=[
@@ -190,7 +258,7 @@ def seeded_store() -> Store:
             ShapReason(feature="FIRST_PAYMENT_THIS_QUARTER", value=1, contribution=7),
         ],
     )
-    s.risk[PR_188] = RiskScore(score=41, level=RiskLevel.MEDIUM, model_version="rules-0.1")
-    s.risk[PR_189] = RiskScore(score=8, level=RiskLevel.LOW, model_version="rules-0.1")
-    s.risk[PR_190] = RiskScore(score=12, level=RiskLevel.LOW, model_version="rules-0.1")
+    s.risks[PR_188] = RiskScore(score=41, level=RiskLevel.MEDIUM, model_version="rules-0.1")
+    s.risks[PR_189] = RiskScore(score=8, level=RiskLevel.LOW, model_version="rules-0.1")
+    s.risks[PR_190] = RiskScore(score=12, level=RiskLevel.LOW, model_version="rules-0.1")
     return s

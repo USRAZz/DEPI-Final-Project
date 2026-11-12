@@ -17,7 +17,7 @@ from securefin_contracts import BankAccountStatus, Invoice
 from securefin_contracts.risk import RiskFeatures
 
 from .deps import StoreDep
-from .store import Store
+from .store import DataStore
 
 TOTAL_MISMATCH = "TOTAL_MISMATCH"  # extractor issue code: subtotal + tax != total
 
@@ -26,7 +26,7 @@ def _normalize_iban(value: str) -> str:
     return value.replace(" ", "").upper()
 
 
-def compute_risk_features(store: Store, invoice: Invoice) -> RiskFeatures:
+def compute_risk_features(store: DataStore, invoice: Invoice) -> RiskFeatures:
     """None means "not known", which the risk service scores the same as False."""
     fields = invoice.fields
     accounts = store.vendor_accounts(invoice.vendor_id, invoice.company_id) if invoice.vendor_id else []
@@ -63,7 +63,7 @@ internal_router = APIRouter(prefix="/v1", dependencies=[Depends(require_service_
 @internal_router.get("/invoices/{invoice_id}/risk-features")
 def risk_features(invoice_id: int, store: StoreDep) -> RiskFeatures:
     # Trusted internal caller with no company context: look the invoice up directly.
-    invoice = store.invoices.get(invoice_id)
+    invoice = store.invoice_by_id(invoice_id)
     if invoice is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "invoice not found")
     return compute_risk_features(store, invoice)
