@@ -152,6 +152,31 @@ def test_letters_inside_amounts_are_fixed():
     assert ocr.fix_numbers("INV-2026-0042 SO20260000001234") == "INV-2026-0042 SO20260000001234"
 
 
+def test_reread_only_when_an_arabic_table_line_is_weak():
+    def payload(score):  # one header word (ignored however weak) and one Arabic table line
+        return [{"rec_texts": ["شركة", "خمة صيانة"], "rec_scores": [0.1, score],
+                 "rec_boxes": [[0, 10, 50, 30], [0, 900, 50, 920]]}]
+    assert ocr.needs_reread(payload(0.6), page_height=1600)
+    assert not ocr.needs_reread(payload(0.95), page_height=1600)
+
+
+def test_qari_reread_is_added_after_paddle_text_only_when_enabled(monkeypatch):
+    empty = {"rec_texts": [], "rec_scores": [], "rec_boxes": []}
+    ar = FakePaddle({"rec_texts": ["خمة صيانة"], "rec_scores": [0.5], "rec_boxes": [[0, 30, 10, 38]]}, header=empty)
+    monkeypatch.setattr(ocr, "_paddle_model", lambda lang: ar if lang == "ar" else FakePaddle(empty))
+    monkeypatch.setattr(ocr, "qari_table_lines", lambda img: ["خدمة صيانة"])
+    monkeypatch.setenv("OCR_ARABIC_REREAD", "qari")
+    text, _ = ocr._paddle(Image.new("RGB", (40, 40), "white"))
+    assert text.splitlines() == ["خمة صيانة", ocr.REREAD_MARKER, "خدمة صيانة"]
+    monkeypatch.delenv("OCR_ARABIC_REREAD")
+    assert ocr._paddle(Image.new("RGB", (40, 40), "white"))[0] == "خمة صيانة"  # off by default
+
+
+def test_amount_tokens_are_dropped_from_the_second_reading():
+    line = "خدمة صيانة 5 1,250.00 6,250.00 ج.م"
+    assert " ".join(w for w in line.split() if not ocr._AMOUNT.fullmatch(w)) == "خدمة صيانة"
+
+
 class FakePaddle:
     """Returns page-pixel boxes; for the 2x header crop it returns them in crop pixels, like PaddleOCR."""
 
