@@ -77,3 +77,6 @@ eval/output/
 /.tmp-*/
 
 .venv-*/
+
+# n8n credentials filled in from n8n/credentials.example.json
+n8n/credentials.json
