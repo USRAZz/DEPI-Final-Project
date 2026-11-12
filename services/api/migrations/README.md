@@ -10,14 +10,19 @@ cd services/api && alembic upgrade head           # locally, with DATABASE_URL s
 
 New migration from a change in `app/db.py`: `cd services/api && alembic revision --autogenerate -m "..."`, then read it.
 
-## What each migration does
+## 0001: the whole schema
 
-| Revision | Content |
-|---|---|
-| `0001` | The api tables from `app/db.py` (companies, users, vendors, bank_accounts, invoices, payment_requests, approval_responses, payment_risk) plus `approvals` and `audit_log`. A trigger makes `approvals` and `audit_log` append-only for everyone (no UPDATE, DELETE or TRUNCATE). |
-| `0002` | Security layer: `approvals.company_id`, roles `securefin_app` and `securefin_gateway`, row-level security by `app.company_id`. |
+`0001` creates every table from `app/db.py` (autogenerate) and the security layer in the same migration:
 
-## Row-level security (0002)
+- Every tenant row carries `company_id`; references are `(company_id, x_id)`, so a row cannot point at another
+  company's vendor, user, invoice or account.
+- Status, role, language and source columns only accept the shared contract values (CHECK constraints).
+- `approvals` and `audit_log` are append-only for everyone (trigger: no UPDATE, DELETE or TRUNCATE).
+- Roles `securefin_app` (api) and `securefin_gateway`, and row-level security by `app.company_id`.
+
+`tests/test_migrations.py` fails when `app/db.py` and the migrated database differ.
+
+## Row-level security
 
 Each tenant table is filtered by the transaction setting `app.company_id`. Without it, queries return zero rows.
 A service switches role in each transaction:
@@ -34,7 +39,8 @@ COMMIT;
   SELECT and INSERT, and `securefin_app` (the api) has no access at all; the api keeps its own copy of each answer in
   `approval_responses`. The gateway sets `expires_at` (72 hours after signing).
 - The api tables have RLS **enabled, not forced**: a connection that switches to `securefin_app` sees one company;
-  the owner login (migrations, the current api) is not filtered. Moving the api onto `securefin_app` is the next step.
+  the owner login is not filtered. The api's `SqlStore` runs every read for one company as `securefin_app`; lookups
+  that come before the company is known (the signed-in user, service-to-service reads by id) use the owner login.
 - `audit_log` columns follow the `AuditEntry` contract plus `company_id`; each company's chain starts with
   `prev_hash = '0' * 64`.
 

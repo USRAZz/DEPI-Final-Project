@@ -2,8 +2,12 @@
 
 Rows are turned into the same contract models the in-memory Store returns, so routes
 cannot tell the two apart. Each method is one short transaction.
-"""
 
+Reads for one company run as role securefin_app with app.company_id set (migration 0001), so PostgreSQL's
+row-level security filters them as well as the WHERE clause. Lookups that come before the company is known
+(the signed-in user, service-to-service reads by id) and the sample-data loader use the owner login.
+"""
+from contextlib import contextmanager
 from datetime import UTC, datetime
 
 from securefin_contracts import (
@@ -17,7 +21,7 @@ from securefin_contracts import (
     User,
     Vendor,
 )
-from sqlalchemy import func, select, update
+from sqlalchemy import func, select, text, update
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -74,8 +78,21 @@ class SqlStore:
         with self._session() as s:
             return s.scalars(stmt).first()
 
+    @contextmanager
+    def _tenant(self, company_id: int):
+        """A read-only transaction that PostgreSQL limits to one company (no-op on SQLite)."""
+        with self._session() as s, s.begin():
+            if s.get_bind().dialect.name == "postgresql":
+                s.execute(text("SET LOCAL ROLE securefin_app"))
+                s.execute(text("SELECT set_config('app.company_id', :c, true)"), {"c": str(company_id)})
+            yield s
+
+    def _tenant_one(self, company_id: int, stmt):
+        with self._tenant(company_id) as s:
+            return s.scalars(stmt).first()
+
     def _scoped(self, model, item_id: int, company_id: int):
-        return self._one(select(model).where(model.id == item_id, model.company_id == company_id))
+        return self._tenant_one(company_id, select(model).where(model.id == item_id, model.company_id == company_id))
 
     # -- reads -----------------------------------------------------------------
 
@@ -101,7 +118,7 @@ class SqlStore:
         return _account(self._scoped(BankAccountRow, account_id, company_id))
 
     def vendor_accounts(self, vendor_id: int, company_id: int) -> list[BankAccount]:
-        with self._session() as s:
+        with self._tenant(company_id) as s:
             rows = s.scalars(select(BankAccountRow).where(
                 BankAccountRow.vendor_id == vendor_id, BankAccountRow.company_id == company_id,
             ).order_by(BankAccountRow.id))
@@ -117,7 +134,7 @@ class SqlStore:
         return self.user(user_id) if user_id is not None else None
 
     def pending_requests(self, company_id: int) -> list[PaymentRecord]:
-        with self._session() as s:
+        with self._tenant(company_id) as s:
             rows = s.scalars(select(PaymentRequestRow).where(
                 PaymentRequestRow.company_id == company_id,
                 PaymentRequestRow.status == InvoiceStatus.PENDING_APPROVAL.value,
@@ -125,11 +142,11 @@ class SqlStore:
             return [_payment(r) for r in rows]
 
     def flagged_invoice_count(self, company_id: int) -> int:
-        return self._one(select(func.count()).select_from(InvoiceRow).where(
+        return self._tenant_one(company_id, select(func.count()).select_from(InvoiceRow).where(
             InvoiceRow.company_id == company_id, InvoiceRow.status == InvoiceStatus.FLAGGED.value))
 
     def on_hold_account_count(self, company_id: int) -> int:
-        return self._one(select(func.count()).select_from(BankAccountRow).where(
+        return self._tenant_one(company_id, select(func.count()).select_from(BankAccountRow).where(
             BankAccountRow.company_id == company_id, BankAccountRow.status == BankAccountStatus.ON_HOLD.value))
 
     def risk(self, request_id: int) -> RiskScore | None:
@@ -190,6 +207,11 @@ class SqlStore:
         """Insert everything in an in-memory Store, e.g. the sample data, in one transaction."""
         with self._session.begin() as s:
             _insert_all(s, data)
+            if s.get_bind().dialect.name == "postgresql":
+                # rows came with their own ids: move each id sequence past them so new rows do not collide
+                for table in ("companies", "users", "vendors", "bank_accounts", "invoices", "payment_requests"):
+                    s.execute(text(f"SELECT setval(pg_get_serial_sequence('{table}', 'id'), "
+                                   f"(SELECT coalesce(max(id), 0) + 1 FROM {table}), false)"))
 
 
 def _insert_all(s: Session, data: Store) -> None:

@@ -1,17 +1,38 @@
-"""initial schema: api tables, approvals and audit_log
+"""initial schema: tenant tables, gateway-only approvals and audit_log, row-level security from the first migration
 
-The api writes every table except approvals and audit_log, which only the gateway writes
-(issue #15). Those two are append-only: a trigger rejects UPDATE and DELETE for every user.
+Tables: generated from app/db.py (autogenerate), so the api's ORM and the database never drift
+(tests/test_migrations.py compares them). Rules (issue #15):
+- Every tenant row has company_id; references are (company_id, x_id), so no row can point at another company's row.
+- Status, role and language columns only accept the shared contract values.
+- approvals and audit_log: append-only for everyone (trigger), only role securefin_gateway may SELECT/INSERT them,
+  row-level security FORCED (even the table owner sees one company at a time).
+- api tables: row-level security ENABLED for role securefin_app; the owner login (migrations, seed, service-to-service
+  lookups) is not filtered.
+
+How a service connects:
+    BEGIN;
+    SET LOCAL ROLE securefin_app;        -- the gateway uses securefin_gateway
+    SELECT set_config('app.company_id', '<company id from the session>', true);
+    ... queries ...
+    COMMIT;
+No app.company_id -> zero rows.
 
 Revision ID: 0001
 Revises:
-Create Date: 2026-11-10 02:44:45.785345
+Create Date: 2026-11-13
 """
 import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
-APPEND_ONLY = ("approvals", "audit_log")
+APP_ROLE = "securefin_app"          # api
+GATEWAY_ROLE = "securefin_gateway"  # gateway: the only writer of approvals and audit_log
+TENANT = "NULLIF(current_setting('app.company_id', true), '')::integer"
+API_TABLES = ("users", "vendors", "bank_accounts", "invoices", "payment_requests", "approval_responses")
+GATEWAY_TABLES = ("approvals", "audit_log")
+SEQUENCES = {APP_ROLE: ("companies", "users", "vendors", "bank_accounts", "invoices", "payment_requests",
+                        "approval_responses"),
+             GATEWAY_ROLE: GATEWAY_TABLES}
 
 revision = '0001'
 down_revision = None
@@ -27,6 +48,7 @@ def upgrade() -> None:
     sa.Column('tax_id', sa.String(length=20), nullable=True),
     sa.Column('default_language', sa.String(length=2), nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
+    sa.CheckConstraint("default_language IN ('ar', 'en')", name='ck_companies_default_language'),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_table('users',
@@ -38,8 +60,12 @@ def upgrade() -> None:
     sa.Column('language', sa.String(length=2), nullable=False),
     sa.Column('is_active', sa.Boolean(), nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
+    sa.CheckConstraint("language IN ('ar', 'en')", name='ck_users_language'),
+    sa.CheckConstraint("email LIKE '_%@_%'", name='ck_users_email'),
+    sa.CheckConstraint("role IN ('viewer', 'accountant', 'approver', 'admin')", name='ck_users_role'),
     sa.ForeignKeyConstraint(['company_id'], ['companies.id'], ),
     sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('company_id', 'id', name='uq_users_company_id_id'),
     sa.UniqueConstraint('email')
     )
     op.create_index(op.f('ix_users_company_id'), 'users', ['company_id'], unique=False)
@@ -50,13 +76,14 @@ def upgrade() -> None:
     sa.Column('tax_id', sa.String(length=20), nullable=True),
     sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
     sa.ForeignKeyConstraint(['company_id'], ['companies.id'], ),
-    sa.PrimaryKeyConstraint('id')
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('company_id', 'id', name='uq_vendors_company_id_id')
     )
     op.create_index(op.f('ix_vendors_company_id'), 'vendors', ['company_id'], unique=False)
     op.create_table('audit_log',
     sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
     sa.Column('timestamp', sa.DateTime(timezone=True), nullable=False),
-    sa.Column('company_id', sa.Integer(), nullable=True),
+    sa.Column('company_id', sa.Integer(), nullable=False),
     sa.Column('user_id', sa.Integer(), nullable=True),
     sa.Column('action', sa.String(length=100), nullable=False),
     sa.Column('tool_call', sa.String(length=100), nullable=True),
@@ -67,8 +94,10 @@ def upgrade() -> None:
     sa.Column('source_service', sa.String(length=40), nullable=False),
     sa.Column('prev_hash', sa.String(length=64), nullable=False),
     sa.Column('entry_hash', sa.String(length=64), nullable=False),
+    sa.CheckConstraint("entry_hash ~ '^[0-9a-f]{64}$'", name='ck_audit_log_entry_hash'),
+    sa.CheckConstraint("prev_hash ~ '^[0-9a-f]{64}$'", name='ck_audit_log_prev_hash'),
+    sa.ForeignKeyConstraint(['company_id', 'user_id'], ['users.company_id', 'users.id'], name='fk_audit_log_user_id_same_company'),
     sa.ForeignKeyConstraint(['company_id'], ['companies.id'], ),
-    sa.ForeignKeyConstraint(['user_id'], ['users.id'], ),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('entry_hash')
     )
@@ -86,11 +115,14 @@ def upgrade() -> None:
     sa.Column('requested_by', sa.Integer(), nullable=True),
     sa.Column('times_paid', sa.Integer(), nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
+    sa.CheckConstraint("status IN ('on_hold', 'verified', 'rejected')", name='ck_bank_accounts_status'),
+    sa.CheckConstraint('times_paid >= 0', name='ck_bank_accounts_times_paid'),
+    sa.ForeignKeyConstraint(['company_id', 'requested_by'], ['users.company_id', 'users.id'], name='fk_bank_accounts_requested_by_same_company'),
+    sa.ForeignKeyConstraint(['company_id', 'vendor_id'], ['vendors.company_id', 'vendors.id'], name='fk_bank_accounts_vendor_id_same_company'),
+    sa.ForeignKeyConstraint(['company_id', 'verified_by'], ['users.company_id', 'users.id'], name='fk_bank_accounts_verified_by_same_company'),
     sa.ForeignKeyConstraint(['company_id'], ['companies.id'], ),
-    sa.ForeignKeyConstraint(['requested_by'], ['users.id'], ),
-    sa.ForeignKeyConstraint(['vendor_id'], ['vendors.id'], ),
-    sa.ForeignKeyConstraint(['verified_by'], ['users.id'], ),
-    sa.PrimaryKeyConstraint('id')
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('company_id', 'id', name='uq_bank_accounts_company_id_id')
     )
     op.create_index(op.f('ix_bank_accounts_company_id'), 'bank_accounts', ['company_id'], unique=False)
     op.create_index(op.f('ix_bank_accounts_vendor_id'), 'bank_accounts', ['vendor_id'], unique=False)
@@ -108,11 +140,15 @@ def upgrade() -> None:
     sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
     sa.Column('extraction_issues', sa.JSON().with_variant(postgresql.JSONB(astext_type=sa.Text()), 'postgresql'), nullable=False),
     sa.Column('ocr_confidence', sa.Float(), nullable=True),
+    sa.CheckConstraint("source IN ('upload', 'email', 'eta')", name='ck_invoices_source'),
+    sa.CheckConstraint("status IN ('VALIDATED', 'NEEDS-REVIEW', 'FLAGGED', 'VENDOR_CHANGE_PENDING', 'PENDING_APPROVAL', 'PAID_SIMULATED', 'REJECTED')", name='ck_invoices_status'),
+    sa.CheckConstraint('ocr_confidence BETWEEN 0 AND 1', name='ck_invoices_ocr_confidence'),
+    sa.ForeignKeyConstraint(['company_id', 'duplicate_of'], ['invoices.company_id', 'invoices.id'], name='fk_invoices_duplicate_of_same_company'),
+    sa.ForeignKeyConstraint(['company_id', 'uploaded_by'], ['users.company_id', 'users.id'], name='fk_invoices_uploaded_by_same_company'),
+    sa.ForeignKeyConstraint(['company_id', 'vendor_id'], ['vendors.company_id', 'vendors.id'], name='fk_invoices_vendor_id_same_company'),
     sa.ForeignKeyConstraint(['company_id'], ['companies.id'], ),
-    sa.ForeignKeyConstraint(['duplicate_of'], ['invoices.id'], ),
-    sa.ForeignKeyConstraint(['uploaded_by'], ['users.id'], ),
-    sa.ForeignKeyConstraint(['vendor_id'], ['vendors.id'], ),
-    sa.PrimaryKeyConstraint('id')
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('company_id', 'id', name='uq_invoices_company_id_id')
     )
     op.create_index(op.f('ix_invoices_company_id'), 'invoices', ['company_id'], unique=False)
     op.create_table('payment_requests',
@@ -127,14 +163,16 @@ def upgrade() -> None:
     sa.Column('status', sa.String(length=30), nullable=False),
     sa.Column('note', sa.String(length=500), nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
+    sa.CheckConstraint("status IN ('VALIDATED', 'NEEDS-REVIEW', 'FLAGGED', 'VENDOR_CHANGE_PENDING', 'PENDING_APPROVAL', 'PAID_SIMULATED', 'REJECTED')", name='ck_payment_requests_status'),
     sa.CheckConstraint('amount > 0', name='ck_payment_requests_amount_positive'),
     sa.CheckConstraint('length(currency) = 3', name='ck_payment_requests_currency_code'),
-    sa.ForeignKeyConstraint(['bank_account_id'], ['bank_accounts.id'], ),
+    sa.ForeignKeyConstraint(['company_id', 'bank_account_id'], ['bank_accounts.company_id', 'bank_accounts.id'], name='fk_payment_requests_bank_account_id_same_company'),
+    sa.ForeignKeyConstraint(['company_id', 'creator_id'], ['users.company_id', 'users.id'], name='fk_payment_requests_creator_id_same_company'),
+    sa.ForeignKeyConstraint(['company_id', 'invoice_id'], ['invoices.company_id', 'invoices.id'], name='fk_payment_requests_invoice_id_same_company'),
+    sa.ForeignKeyConstraint(['company_id', 'vendor_id'], ['vendors.company_id', 'vendors.id'], name='fk_payment_requests_vendor_id_same_company'),
     sa.ForeignKeyConstraint(['company_id'], ['companies.id'], ),
-    sa.ForeignKeyConstraint(['creator_id'], ['users.id'], ),
-    sa.ForeignKeyConstraint(['invoice_id'], ['invoices.id'], ),
-    sa.ForeignKeyConstraint(['vendor_id'], ['vendors.id'], ),
-    sa.PrimaryKeyConstraint('id')
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('company_id', 'id', name='uq_payment_requests_company_id_id')
     )
     op.create_index(op.f('ix_payment_requests_company_id'), 'payment_requests', ['company_id'], unique=False)
     op.create_index(op.f('ix_payment_requests_status'), 'payment_requests', ['status'], unique=False)
@@ -149,25 +187,30 @@ def upgrade() -> None:
     sa.Column('approvals_required', sa.Integer(), nullable=False),
     sa.Column('reasons', sa.JSON().with_variant(postgresql.JSONB(astext_type=sa.Text()), 'postgresql'), nullable=False),
     sa.Column('at', sa.DateTime(timezone=True), nullable=False),
-    sa.ForeignKeyConstraint(['approver_id'], ['users.id'], ),
+    sa.CheckConstraint("status IN ('PENDING_APPROVAL', 'APPROVED', 'REJECTED', 'EXPIRED')", name='ck_approval_responses_status'),
+    sa.ForeignKeyConstraint(['company_id', 'approver_id'], ['users.company_id', 'users.id'], name='fk_approval_responses_approver_id_same_company'),
+    sa.ForeignKeyConstraint(['company_id', 'payment_request_id'], ['payment_requests.company_id', 'payment_requests.id'], name='fk_approval_responses_payment_request_id_same_company'),
     sa.ForeignKeyConstraint(['company_id'], ['companies.id'], ),
-    sa.ForeignKeyConstraint(['payment_request_id'], ['payment_requests.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index(op.f('ix_approval_responses_payment_request_id'), 'approval_responses', ['payment_request_id'], unique=False)
     op.create_table('approvals',
     sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
+    sa.Column('company_id', sa.Integer(), nullable=False),
     sa.Column('payment_request_id', sa.Integer(), nullable=False),
     sa.Column('approver_id', sa.Integer(), nullable=False),
     sa.Column('approve', sa.Boolean(), nullable=False),
     sa.Column('hmac_signature', sa.String(length=128), nullable=False),
     sa.Column('signed_at', sa.DateTime(timezone=True), nullable=False),
     sa.Column('expires_at', sa.DateTime(timezone=True), nullable=False),
-    sa.ForeignKeyConstraint(['approver_id'], ['users.id'], ),
-    sa.ForeignKeyConstraint(['payment_request_id'], ['payment_requests.id'], ),
+    sa.CheckConstraint('expires_at > signed_at', name='ck_approvals_expiry'),
+    sa.ForeignKeyConstraint(['company_id', 'approver_id'], ['users.company_id', 'users.id'], name='fk_approvals_approver_id_same_company'),
+    sa.ForeignKeyConstraint(['company_id', 'payment_request_id'], ['payment_requests.company_id', 'payment_requests.id'], name='fk_approvals_payment_request_id_same_company'),
+    sa.ForeignKeyConstraint(['company_id'], ['companies.id'], ),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('payment_request_id', 'approver_id', name='uq_approvals_one_per_approver')
     )
+    op.create_index(op.f('ix_approvals_company_id'), 'approvals', ['company_id'], unique=False)
     op.create_index(op.f('ix_approvals_payment_request_id'), 'approvals', ['payment_request_id'], unique=False)
     op.create_table('payment_risk',
     sa.Column('payment_request_id', sa.Integer(), nullable=False),
@@ -176,32 +219,84 @@ def upgrade() -> None:
     sa.Column('rule_hits', sa.JSON().with_variant(postgresql.JSONB(astext_type=sa.Text()), 'postgresql'), nullable=False),
     sa.Column('shap_reasons', sa.JSON().with_variant(postgresql.JSONB(astext_type=sa.Text()), 'postgresql'), nullable=False),
     sa.Column('model_version', sa.String(length=40), nullable=False),
+    sa.CheckConstraint("level IN ('low', 'medium', 'high')", name='ck_payment_risk_level'),
+    sa.CheckConstraint('score BETWEEN 0 AND 100', name='ck_payment_risk_score'),
     sa.ForeignKeyConstraint(['payment_request_id'], ['payment_requests.id'], ),
     sa.PrimaryKeyConstraint('payment_request_id')
     )
     # ### end Alembic commands ###
+    _security()
 
+
+def _policy(table: str, using: str) -> str:
+    return (f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY;"
+            f"CREATE POLICY tenant_isolation ON {table} USING ({using}) WITH CHECK ({using});")
+
+
+def _security() -> None:
     op.execute("""
         CREATE FUNCTION reject_change() RETURNS trigger LANGUAGE plpgsql AS $$
         BEGIN
             RAISE EXCEPTION '% is append-only: % is not allowed', TG_TABLE_NAME, TG_OP;
         END $$;
     """)
-    for table in APPEND_ONLY:
-        op.execute(f"CREATE TRIGGER {table}_append_only BEFORE UPDATE OR DELETE ON {table} "
+    for t in GATEWAY_TABLES:
+        op.execute(f"CREATE TRIGGER {t}_append_only BEFORE UPDATE OR DELETE ON {t} "
                    "FOR EACH ROW EXECUTE FUNCTION reject_change()")
-        op.execute(f"CREATE TRIGGER {table}_no_truncate BEFORE TRUNCATE ON {table} "
+        op.execute(f"CREATE TRIGGER {t}_no_truncate BEFORE TRUNCATE ON {t} "
                    "FOR EACH STATEMENT EXECUTE FUNCTION reject_change()")
+
+    for role in (APP_ROLE, GATEWAY_ROLE):
+        op.execute(f"""
+            DO $$ BEGIN
+                IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '{role}') THEN
+                    CREATE ROLE {role} NOLOGIN;
+                END IF;
+                -- the login the services use must be allowed to SET ROLE to it (Neon and other managed Postgres)
+                EXECUTE format('GRANT {role} TO %I', current_user);
+            EXCEPTION WHEN insufficient_privilege OR invalid_grant_operation THEN
+                RAISE NOTICE 'could not grant {role} to %: grant it by hand', current_user;
+            END $$;
+        """)
+        op.execute(f"GRANT USAGE ON SCHEMA public TO {role}")
+
+    op.execute(_policy("companies", f"id = {TENANT}"))
+    for t in API_TABLES:
+        op.execute(_policy(t, f"company_id = {TENANT}"))
+    op.execute(_policy("payment_risk", "EXISTS (SELECT 1 FROM payment_requests p "
+                                       f"WHERE p.id = payment_request_id AND p.company_id = {TENANT})"))
+    op.execute(f"GRANT SELECT ON companies TO {APP_ROLE}")
+    for t in API_TABLES + ("payment_risk",):
+        op.execute(f"GRANT SELECT, INSERT, UPDATE, DELETE ON {t} TO {APP_ROLE}")
+
+    for t in GATEWAY_TABLES:
+        op.execute(_policy(t, f"company_id = {TENANT}") + f"ALTER TABLE {t} FORCE ROW LEVEL SECURITY;")
+        op.execute(f"REVOKE ALL ON {t} FROM PUBLIC")
+        op.execute(f"GRANT SELECT, INSERT ON {t} TO {GATEWAY_ROLE}")
+
+    for role, tables in SEQUENCES.items():
+        for t in tables:
+            op.execute(f"GRANT USAGE ON SEQUENCE {t}_id_seq TO {role}")
 
 
 def downgrade() -> None:
-    for table in APPEND_ONLY:
-        op.execute(f"DROP TRIGGER IF EXISTS {table}_no_truncate ON {table}")
-        op.execute(f"DROP TRIGGER IF EXISTS {table}_append_only ON {table}")
+    for t in GATEWAY_TABLES:
+        op.execute(f"DROP TRIGGER IF EXISTS {t}_no_truncate ON {t}")
+        op.execute(f"DROP TRIGGER IF EXISTS {t}_append_only ON {t}")
     op.execute("DROP FUNCTION IF EXISTS reject_change()")
+    for role in (APP_ROLE, GATEWAY_ROLE):
+        op.execute(f"""
+            DO $$ BEGIN
+                IF EXISTS (SELECT FROM pg_roles WHERE rolname = '{role}') THEN
+                    EXECUTE 'DROP OWNED BY {role}';
+                    DROP ROLE {role};
+                END IF;
+            END $$;
+        """)
     # ### commands auto generated by Alembic - please adjust! ###
     op.drop_table('payment_risk')
     op.drop_index(op.f('ix_approvals_payment_request_id'), table_name='approvals')
+    op.drop_index(op.f('ix_approvals_company_id'), table_name='approvals')
     op.drop_table('approvals')
     op.drop_index(op.f('ix_approval_responses_payment_request_id'), table_name='approval_responses')
     op.drop_table('approval_responses')

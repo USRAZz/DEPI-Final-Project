@@ -1,5 +1,5 @@
-"""Migrations 0001 + 0002 and row-level security against a real PostgreSQL. Skipped unless TEST_DATABASE_URL is set
-(CI sets it with a postgres service). The database must be empty: the test upgrades and downgrades it.
+"""Migration 0001 and row-level security against a real PostgreSQL. Skipped unless TEST_DATABASE_URL is set
+(CI sets it with a postgres service). Everything in its public schema is dropped first.
 
     docker run -d --rm --name sf-pg -e POSTGRES_PASSWORD=test -p 55432:5432 postgres:16
     TEST_DATABASE_URL=postgresql+psycopg://postgres:test@localhost:55432/postgres pytest tests/test_migrations.py
@@ -43,8 +43,10 @@ def engine():
     from sqlalchemy import create_engine, text
 
     os.environ["DATABASE_URL"] = URL
-    command.upgrade(_cfg(), "head")
     eng = create_engine(URL)
+    with eng.begin() as c:  # start from an empty schema, whatever an earlier test left behind
+        c.exec_driver_sql("DROP SCHEMA public CASCADE; CREATE SCHEMA public; GRANT USAGE ON SCHEMA public TO PUBLIC")
+    command.upgrade(_cfg(), "head")
     with eng.begin() as c:  # superuser: seeds two tenants (RLS does not apply to superusers)
         c.execute(text(SEED))
     yield eng
@@ -65,9 +67,32 @@ AUDIT = ("INSERT INTO audit_log (timestamp, company_id, action, parameters, sour
          "VALUES (now(), :c, 'authorize', '{}', 'gateway', :p, :e)")
 
 
-def test_single_head_is_0002():
+def test_single_head_is_0001():
     from alembic.script import ScriptDirectory
-    assert ScriptDirectory.from_config(_cfg()).get_heads() == ["0002"]
+    assert ScriptDirectory.from_config(_cfg()).get_heads() == ["0001"]
+
+
+def test_database_matches_the_orm(engine):
+    """app/db.py and the migrated database describe the same tables (a model change needs a migration)."""
+    from alembic.autogenerate import compare_metadata
+    from alembic.migration import MigrationContext
+    from app.db import Base
+    with engine.connect() as c:
+        assert compare_metadata(MigrationContext.configure(c), Base.metadata) == []
+
+
+def test_rows_cannot_point_at_another_companys_rows(engine):
+    from sqlalchemy import exc, text
+    with pytest.raises(exc.IntegrityError, match="same_company"), engine.begin() as c:  # superuser: only the FK stops it
+        c.execute(text("INSERT INTO invoices (company_id, vendor_id, source, status, file_key, created_at, "
+                       "extraction_issues) VALUES (1, 2, 'upload', 'VALIDATED', 'k2', now(), '[]')"))
+
+
+def test_status_and_role_only_take_contract_values(engine):
+    from sqlalchemy import exc, text
+    for stmt in ("UPDATE payment_requests SET status = 'PAID'", "UPDATE users SET role = 'root'"):
+        with pytest.raises(exc.IntegrityError, match="ck_"), engine.begin() as c:
+            c.execute(text(stmt))
 
 
 def test_no_company_set_returns_zero_rows(engine):

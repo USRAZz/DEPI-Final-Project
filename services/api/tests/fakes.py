@@ -94,21 +94,40 @@ class DownGateway:
         raise GatewayUnavailable("ConnectTimeout")
 
 
+def migrated_postgres(url: str):
+    """A fresh schema in the PostgreSQL at url, built by the real migrations (roles, row-level security)."""
+    import os
+    from pathlib import Path
+
+    from alembic import command
+    from alembic.config import Config
+    from app.db import make_engine
+
+    api = Path(__file__).resolve().parents[1]
+    cfg = Config(str(api / "alembic.ini"))
+    cfg.set_main_option("script_location", str(api / "migrations"))
+    os.environ["DATABASE_URL"] = url
+    engine = make_engine(url)
+    with engine.begin() as c:  # start from nothing, whatever an earlier run left behind
+        c.exec_driver_sql("DROP SCHEMA public CASCADE; CREATE SCHEMA public; GRANT USAGE ON SCHEMA public TO PUBLIC")
+    command.upgrade(cfg, "head")
+    return engine
+
+
 def sql_store_with_sample_data(url: str | None = None):
     """SqlStore with the same sample data as seeded_store(): on an in-memory SQLite database, or,
-    given a url, on a fresh schema in that database (all its tables are dropped first)."""
-    from app.db import Base, make_engine
+    given a url, on a fresh schema in that database (everything in its public schema is dropped first)."""
+    from app.db import Base
     from app.sql_store import SqlStore
     from app.store import seeded_store
     from sqlalchemy import create_engine
     from sqlalchemy.pool import StaticPool
 
     if url:
-        engine = make_engine(url)
-        Base.metadata.drop_all(engine)
+        engine = migrated_postgres(url)
     else:
         engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
-    Base.metadata.create_all(engine)
+        Base.metadata.create_all(engine)
     store = SqlStore(engine)
     store.load(seeded_store())
     return store

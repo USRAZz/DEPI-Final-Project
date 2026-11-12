@@ -1,7 +1,7 @@
 """Where signed approvals are kept.
 
 `ApprovalStore` is the interface. `InMemoryApprovalStore` is for local runs and tests (lost on restart);
-`PostgresApprovalStore` uses the `approvals` table (migrations 0001 + 0002) (GitHub issue #15). company_id selects
+`PostgresApprovalStore` uses the `approvals` table (migration 0001) (GitHub issue #15). company_id selects
 the tenant for row-level security; the in-memory store ignores it.
 """
 import threading

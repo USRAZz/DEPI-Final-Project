@@ -1,5 +1,5 @@
-"""Approvals and audit_log in PostgreSQL through role securefin_gateway (migrations 0001 + 0002, issues #15 and #16).
-Skipped unless TEST_DATABASE_URL points at an EMPTY database (the test upgrades and downgrades it)."""
+"""Approvals and audit_log in PostgreSQL through role securefin_gateway (migration 0001, issues #15 and #16).
+Skipped unless TEST_DATABASE_URL is set; everything in that database's public schema is dropped first."""
 import os
 from datetime import UTC, datetime
 from pathlib import Path
@@ -20,8 +20,10 @@ def engine():
     os.environ["DATABASE_URL"] = URL
     cfg = Config(str(API / "alembic.ini"))
     cfg.set_main_option("script_location", str(API / "migrations"))
-    command.upgrade(cfg, "head")
     eng = create_engine(URL)
+    with eng.begin() as c:  # start from an empty schema, whatever an earlier test left behind
+        c.exec_driver_sql("DROP SCHEMA public CASCADE; CREATE SCHEMA public; GRANT USAGE ON SCHEMA public TO PUBLIC")
+    command.upgrade(cfg, "head")
     with eng.begin() as c:  # superuser seeds what the api would own
         c.execute(text("""
             INSERT INTO companies (name, default_language, created_at) VALUES ('A', 'ar', now()), ('B', 'en', now());
