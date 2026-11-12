@@ -48,8 +48,10 @@ def test_mask_messages_covers_text_parts_and_keeps_images():
     assert msgs[0]["content"][0]["text"] == IBAN  # original untouched
 
 
-def test_only_openai_is_allowed(monkeypatch):
-    assert list(PROVIDERS) == ["openai"]
+
+def test_supported_providers(monkeypatch):
+    assert list(PROVIDERS) == ["openai", "openrouter"]
+
     monkeypatch.setenv("GROQ_API_KEY", "x")
     try:
         LLM("groq", "m")
@@ -57,6 +59,7 @@ def test_only_openai_is_allowed(monkeypatch):
         assert "unknown provider" in str(e)
     else:
         raise AssertionError("groq must be rejected")
+
 
 
 def test_llm_chat_sends_masked_messages(monkeypatch):
