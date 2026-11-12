@@ -10,6 +10,7 @@ back in right-to-left order within each visual line (PaddleOCR returns them left
 """
 import json
 import os
+import re
 from functools import lru_cache
 from pathlib import Path
 
@@ -61,15 +62,142 @@ def _paddle_payloads(model, img) -> list[dict]:
     return out
 
 
+# Supplier header pass (eval/OCR_BENCHMARK.md: Arabic vendor names 89.8% -> 97.7% on the synthetic set):
+# the top 42% of the page, grayscale + autocontrast + sharpen, enlarged 2x, read again by the Arabic model.
+HEADER_FRACTION, HEADER_SCALE = 0.42, 2
+_FOLD = str.maketrans("أإآٱىة", "اااايه")
+
+
+def _key(text: str) -> str:
+    """Comparison key for two readings of the same Arabic text (same idea as the benchmark's normalize)."""
+    import unicodedata
+    s = unicodedata.normalize("NFKC", text).translate(_FOLD)
+    return "".join(c.casefold() for c in s if c.isalnum() and unicodedata.category(c) not in ("Mn", "Cf"))
+
+
+def _is_ar(text: str) -> bool:
+    return any("؀" <= c <= "ۿ" for c in text)
+
+
+def _header_image(img):
+    from PIL import Image, ImageEnhance, ImageFilter, ImageOps
+    h = img.crop((0, 0, img.width, int(img.height * HEADER_FRACTION)))
+    h = ImageEnhance.Contrast(ImageOps.autocontrast(ImageOps.grayscale(h), cutoff=1)).enhance(1.15)
+    h = h.filter(ImageFilter.UnsharpMask(radius=1.4, percent=140, threshold=3))
+    return h.resize((h.width * HEADER_SCALE, h.height * HEADER_SCALE), Image.Resampling.LANCZOS)
+
+
+def _entries(payloads: list[dict], divisor: float = 1.0) -> list[tuple[str, list[float], float]] | None:
+    """(text, box in page pixels, score) for every word box; None when boxes do not line up with texts."""
+    out = []
+    for p in payloads:
+        texts, boxes, scores = p.get("rec_texts", []), p.get("rec_boxes", []), p.get("rec_scores", [])
+        if len(boxes) != len(texts):
+            return None
+        for i, (t, b) in enumerate(zip(texts, boxes, strict=True)):
+            b = list(b)
+            if t and len(b) >= 4:
+                out.append((str(t), [float(v) / divisor for v in b[:4]], float(scores[i]) if i < len(scores) else 0.0))
+    return out
+
+
+def _overlap(a: list[float], b: list[float]) -> float:
+    area_a, area_b = max(a[2] - a[0], 0) * max(a[3] - a[1], 0), max(b[2] - b[0], 0) * max(b[3] - b[1], 0)
+    if not area_a or not area_b:
+        return 0.0
+    inter = max(0.0, min(a[2], b[2]) - max(a[0], b[0])) * max(0.0, min(a[3], b[3]) - max(a[1], b[1]))
+    return inter / min(area_a, area_b)
+
+
+HEADER_MARGIN = 0.05  # the crop reading must be this much surer (mean score) to replace the full-page one
+
+
+def merge_header(full: list, crop: list, page_height: float) -> list[tuple[str, list[float]]]:
+    """Merge full-page Arabic boxes with the header-crop reading.
+    The two passes split text differently (one box 'شركة المرسى للخدمات' vs three word boxes), so boxes that
+    overlap are compared as one group: the full-page group's text against the crop group's text, both read
+    right to left. The crop group wins only when the full page mixed a Latin letter into Arabic ('مصiع') or
+    the crop is clearly surer (HEADER_MARGIN); differing Latin readings are both kept. Crop boxes that overlap
+    nothing are text the full page missed."""
+    limit = page_height * HEADER_FRACTION
+    head = [i for i, (_, b, _) in enumerate(full) if (b[1] + b[3]) / 2 < limit]
+    parent = {("f", i): ("f", i) for i in head} | {("c", j): ("c", j) for j in range(len(crop))}
+
+    def root(n):
+        while parent[n] != n:
+            parent[n] = parent[parent[n]]
+            n = parent[n]
+        return n
+
+    for i in head:
+        for j, c in enumerate(crop):
+            if _overlap(full[i][1], c[1]) >= 0.45:
+                parent[root(("f", i))] = root(("c", j))
+    groups: dict = {}
+    for n in parent:
+        groups.setdefault(root(n), []).append(n)
+
+    def text(entries):
+        return " ".join(order_boxes([e[0] for e in entries], [e[1] for e in entries], right_to_left=True))
+
+    def latin_in_arabic(t):
+        return re.search(r"[؀-ۿ][A-Za-z][؀-ۿ]", t) is not None
+
+    def mean(entries):
+        return sum(e[2] for e in entries) / len(entries)
+
+    chosen = {i: [full[i]] for i in range(len(full)) if i not in head}  # body: untouched
+    for members in groups.values():
+        f = [full[i] for kind, i in sorted(members) if kind == "f"]
+        c = [crop[j] for kind, j in sorted(members) if kind == "c"]
+        if not f:
+            chosen[("c", members[0][1])] = c
+            continue
+        ft, ct = text(f), (text(c) if c else "")
+        first = min(i for kind, i in members if kind == "f")
+        if not c or _key(ft) == _key(ct):
+            chosen[first] = f
+        elif not _is_ar(ct):  # Latin ids/IBANs: keep both readings, one of them is often right
+            chosen[first] = f + c
+        elif (latin_in_arabic(ft) and not latin_in_arabic(ct)) or mean(c) > mean(f) + HEADER_MARGIN:
+            chosen[first] = c
+        else:
+            chosen[first] = f
+    return [(t, b) for es in chosen.values() for t, b, _ in es]
+
+
+_NUM_TOKEN = re.compile(r"(?<![\w])[0-9BOoSlI]{1,3}(?:[.,][0-9BOoSlI]{3})*[.,][0-9BOoSlI]{2}(?![\w])")
+_NUM_FIX = str.maketrans("BOoSlI", "800511")
+
+
+def fix_numbers(line: str) -> str:
+    """Letters the recognizer reads inside amounts ('1,521.B0' -> '1,521.80'). Only tokens shaped like an
+    amount with at least three real digits are touched, so words and ids are left alone."""
+    return _NUM_TOKEN.sub(lambda m: m[0].translate(_NUM_FIX) if sum(ch.isdigit() for ch in m[0]) >= 3 else m[0],
+                          line)
+
+
+def _paddle_text(full_pl: list[dict], head_pl: list[dict], en_pl: list[dict], page_height: float) -> list[str]:
+    """Text lines from the three PaddleOCR passes (pure: no model, so it can be tested and tuned offline)."""
+    full, crop = _entries(full_pl), _entries(head_pl, HEADER_SCALE)
+    if full is None or crop is None:  # boxes missing: keep both readings in engine order
+        lines = [t for p in full_pl + head_pl for t in p.get("rec_texts", [])]
+    else:
+        merged = merge_header(full, crop, page_height)
+        lines = order_boxes([t for t, _ in merged], [b for _, b in merged], right_to_left=True)
+    for p in en_pl:
+        lines.extend(order_boxes([str(t) for t in p.get("rec_texts", [])],
+                                 [list(b) for b in p.get("rec_boxes", [])], right_to_left=False))
+    return [fix_numbers(line) for line in lines]
+
+
 def _paddle(img) -> tuple[str, float | None]:
-    lines: list[str] = []
-    scores: list[float] = []
-    for lang, rtl in (("ar", True), ("en", False)):
-        for p in _paddle_payloads(_paddle_model(lang), img):
-            texts = [str(t) for t in p.get("rec_texts", [])]
-            boxes = [list(b) for b in p.get("rec_boxes", [])]
-            lines.extend(order_boxes(texts, boxes, right_to_left=rtl))
-            scores.extend(float(s) for s in p.get("rec_scores", []))
+    ar = _paddle_model("ar")
+    full_pl = _paddle_payloads(ar, img)
+    head_pl = _paddle_payloads(ar, _header_image(img))
+    en_pl = _paddle_payloads(_paddle_model("en"), img)
+    lines = _paddle_text(full_pl, head_pl, en_pl, img.height)
+    scores = [float(s) for p in full_pl + en_pl for s in p.get("rec_scores", [])]  # full-page passes only
     return "\n".join(lines), (round(sum(scores) / len(scores), 3) if scores else None)
 
 
@@ -122,16 +250,33 @@ def _engine():
     return ENGINES[name]
 
 
+def _page_image(doc, page):
+    """A scanned page as an image: the embedded scan at its own resolution when one image covers the page
+    (no resampling, as in the benchmark), otherwise a 200 dpi render of the page."""
+    import io
+
+    from PIL import Image
+    if page.rotation == 0:
+        area = page.rect.width * page.rect.height
+        for xref, *_ in page.get_images(full=True):
+            rects = page.get_image_rects(xref)
+            if len(rects) == 1 and rects[0].width * rects[0].height >= 0.9 * area:
+                try:
+                    return Image.open(io.BytesIO(doc.extract_image(xref)["image"])).convert("RGB")
+                except Exception:  # unusual image encoding: fall back to rendering
+                    break
+    pix = page.get_pixmap(dpi=200)
+    return Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+
+
 def _pdf(path: Path, ocr) -> tuple[str, float | None]:
     import fitz  # PyMuPDF
-    from PIL import Image
     pages, scores = [], []
     with fitz.open(path) as doc:
         for page in doc:
             text = page.get_text().strip()
-            if len(text) < 20:  # scanned page: render it, then OCR
-                pix = page.get_pixmap(dpi=200)
-                text, score = ocr(Image.frombytes("RGB", [pix.width, pix.height], pix.samples))
+            if len(text) < 20:  # scanned page: OCR the page image
+                text, score = ocr(_page_image(doc, page))
                 if score is not None:
                     scores.append(score)
             pages.append(text)
