@@ -4,6 +4,54 @@
   "nodes": [
     {
       "parameters": {
+        "path": "securefin-test-integrity",
+        "formTitle": "Test 3: integrity run",
+        "formDescription": "Choose what the nightly check should find. While the gateway is not connected the answers are simulated, and the report says so. The result is shown here; no alert is sent.",
+        "formFields": {
+          "values": [
+            {
+              "fieldName": "scenario",
+              "fieldLabel": "What should the check find?",
+              "fieldType": "dropdown",
+              "requiredField": true,
+              "defaultValue": "all_good = everything is fine",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "all_good = everything is fine"
+                  },
+                  {
+                    "option": "broken_chain = someone edited an audit row"
+                  },
+                  {
+                    "option": "deleted_rows = audit rows were deleted"
+                  },
+                  {
+                    "option": "attack_miss = 3 attacks got through"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "responseMode": "responseNode",
+        "options": {
+          "buttonLabel": "Run",
+          "customCss": "#submitted-content { white-space: pre-line; text-align: start; unicode-bidi: plaintext; }"
+        }
+      },
+      "id": "c18",
+      "name": "Test form",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        200
+      ],
+      "webhookId": "securefin-test-integrity"
+    },
+    {
+      "parameters": {
         "rule": {
           "interval": [
             {
@@ -27,7 +75,7 @@
         "httpMethod": "POST",
         "path": "securefin/integrity-run",
         "authentication": "headerAuth",
-        "responseMode": "lastNode",
+        "responseMode": "responseNode",
         "options": {}
       },
       "id": "c2",
@@ -48,7 +96,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const ids = String($env.N8N_AUDIT_COMPANY_IDS ?? '').split(',').map((s) => Number(s.trim())).filter((n) => Number.isInteger(n) && n > 0);\nif (!ids.length) throw new Error('N8N_AUDIT_COMPANY_IDS is empty: nothing would be verified');\nreturn ids.map((company_id) => ({ json: { company_id } }));"
+        "jsCode": "const env = (k) => { try { return String($env[k] ?? ''); } catch (e) { return ''; } };  // '' when unset or blocked\nconst gateway_connected = env('N8N_AUDIT_VERIFY_URL') !== '';\nlet ids = env('N8N_AUDIT_COMPANY_IDS').split(',').map((s) => Number(s.trim())).filter((n) => Number.isInteger(n) && n > 0);\nif (!ids.length && !gateway_connected) ids = [1];  // standalone demo: one pretend company\nif (!ids.length) throw new Error('N8N_AUDIT_COMPANY_IDS is empty: nothing would be verified');\nreturn ids.map((company_id) => ({ json: { company_id, gateway_connected } }));"
       },
       "id": "c3",
       "name": "Companies",
@@ -68,11 +116,11 @@
           },
           "conditions": [
             {
-              "leftValue": "={{ $env.N8N_AUDIT_VERIFY_URL }}",
+              "leftValue": "={{ $json.gateway_connected }}",
               "rightValue": "",
               "operator": {
-                "type": "string",
-                "operation": "notEmpty",
+                "type": "boolean",
+                "operation": "true",
                 "singleValue": true
               }
             }
@@ -91,7 +139,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Standalone mode (N8N_AUDIT_VERIFY_URL is empty): the gateway is not connected yet. This node answers in the\n// gateway's format with SIMULATED data so the rest of the workflow can be shown. Nothing real is checked and\n// the scorecard says so. For the demo, call the \"Run now\" webhook with {\"simulate\": \"...\"}:\n//   broken_chain | deleted_rows | attack_miss   (anything else = all good)\nconst body = $('Run now (demo)').isExecuted ? ($('Run now (demo)').first().json.body ?? {}) : {};\nconst simulate = ['broken_chain', 'deleted_rows', 'attack_miss'].includes(body.simulate) ? body.simulate : 'none';\nreturn $input.all().map((item, i) => ({\n  json: {\n    simulate,\n    statusCode: 200,\n    body: {\n      ok: simulate !== 'broken_chain',\n      company_id: item.json.company_id,\n      entries: simulate === 'deleted_rows' ? 5 : 12,\n      first_broken_index: simulate === 'broken_chain' ? 6 : null,\n      first_broken_id: simulate === 'broken_chain' ? 7 : null,\n      head_hash: null,\n    },\n  },\n  pairedItem: i,\n}));"
+        "jsCode": "// Standalone mode (N8N_AUDIT_VERIFY_URL is empty): the gateway is not connected yet. This node answers in the\n// gateway's format with SIMULATED data so the rest of the workflow can be shown. Nothing real is checked and\n// the scorecard says so. Choose what to simulate in the Test form, or call the \"Run now\" webhook with\n// {\"simulate\": \"...\"}:   broken_chain | deleted_rows | attack_miss   (anything else = all good)\nconst body = $('Run now (demo)').isExecuted ? ($('Run now (demo)').first().json.body ?? {}) : {};\nconst picked = $('Test form').isExecuted ? String($('Test form').first().json['What should the check find?'] ?? '').split(' ')[0] : body.simulate;\nconst simulate = ['broken_chain', 'deleted_rows', 'attack_miss'].includes(picked) ? picked : 'none';\nreturn $input.all().map((item, i) => ({\n  json: {\n    simulate,\n    statusCode: 200,\n    body: {\n      ok: simulate !== 'broken_chain',\n      company_id: item.json.company_id,\n      entries: simulate === 'deleted_rows' ? 5 : 12,\n      first_broken_index: simulate === 'broken_chain' ? 6 : null,\n      first_broken_id: simulate === 'broken_chain' ? 7 : null,\n      head_hash: null,\n    },\n  },\n  pairedItem: i,\n}));"
       },
       "id": "c17",
       "name": "Demo audit verdict",
@@ -140,7 +188,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Anything that is not an explicit {\"ok\": true} from the gateway is a FAIL: timeouts, 5xx, odd bodies.\nconst companies = $('Companies').all().map((i) => i.json.company_id);\nconst results = $input.all().map((item, i) => {\n  const body = item.json.body ?? {};\n  const company_id = companies[i];\n  if (item.json.statusCode !== 200 || typeof body.ok !== 'boolean' || !Number.isInteger(body.entries)) {\n    const why = item.json.error ? String(item.json.error.message ?? item.json.error).slice(0, 120) : `HTTP ${item.json.statusCode ?? 'none'}`;\n    return { company_id, ok: false, detail: `no verdict (${why})` };\n  }\n  if (!body.ok) return { company_id, ok: false, entries: body.entries, detail: `hash chain broken at audit_log id ${body.first_broken_id}` };\n  return { company_id, ok: true, entries: body.entries, head_hash: body.head_hash ?? null, detail: `${body.entries} entries intact` };\n});\nreturn [{ json: { audit: results } }];"
+        "jsCode": "const env = (k) => { try { return String($env[k] ?? ''); } catch (e) { return ''; } };  // '' when unset or blocked\n// Anything that is not an explicit {\"ok\": true} from the gateway is a FAIL: timeouts, 5xx, odd bodies.\nconst companies = $('Companies').all().map((i) => i.json.company_id);\nconst results = $input.all().map((item, i) => {\n  const body = item.json.body ?? {};\n  const company_id = companies[i];\n  if (item.json.statusCode !== 200 || typeof body.ok !== 'boolean' || !Number.isInteger(body.entries)) {\n    const why = item.json.error ? String(item.json.error.message ?? item.json.error).slice(0, 120) : `HTTP ${item.json.statusCode ?? 'none'}`;\n    return { company_id, ok: false, detail: `no verdict (${why})` };\n  }\n  if (!body.ok) return { company_id, ok: false, entries: body.entries, detail: `hash chain broken at audit_log id ${body.first_broken_id}` };\n  return { company_id, ok: true, entries: body.entries, head_hash: body.head_hash ?? null, detail: `${body.entries} entries intact` };\n});\nreturn [{ json: { audit: results, attack_configured: env('N8N_ATTACK_RUN_URL') !== '' } }];"
       },
       "id": "c5",
       "name": "Audit verdicts",
@@ -160,11 +208,11 @@
           },
           "conditions": [
             {
-              "leftValue": "={{ $env.N8N_ATTACK_RUN_URL }}",
+              "leftValue": "={{ $json.attack_configured }}",
               "rightValue": "",
               "operator": {
-                "type": "string",
-                "operation": "notEmpty",
+                "type": "boolean",
+                "operation": "true",
                 "singleValue": true
               }
             }
@@ -219,7 +267,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Builds the scorecard. n8n decides nothing about payments here; it only reports what the services answered.\nconst audit = $('Audit verdicts').first().json.audit;\nconst state = $getWorkflowStaticData('global');\n// demo = standalone mode: the audit answers were simulated by \"Demo audit verdict\" (null when the gateway is connected).\nconst demo = $('Demo audit verdict').isExecuted ? $('Demo audit verdict').first().json.simulate : null;\nconst counts = demo === null ? 'entries' : 'entries_demo';  // simulated counts never mix with real ones\nstate[counts] = state[counts] ?? {};\n// A hash chain proves rows were not edited; it cannot show that the newest rows were deleted. The entry\n// count from the last good run can: it must never go down.\nfor (const a of audit) {\n  const before = state[counts][a.company_id];\n  if (a.ok && Number.isInteger(before) && a.entries < before) {\n    a.ok = false;\n    a.detail = `audit log shrank from ${before} to ${a.entries} entries (rows deleted)`;\n  }\n}\nlet attack = { status: 'not_configured', detail: 'attack suite not configured (N8N_ATTACK_RUN_URL is empty): NOT checked' };\nif ($('Run attack suite').isExecuted) {\n  const r = $('Run attack suite').first().json;\n  const b = r.body ?? {};\n  const min = Number($env.N8N_ATTACK_MIN_CASES ?? 1);\n  const counted = [b.total, b.blocked].every(Number.isInteger) && Array.isArray(b.missed);\n  if (r.statusCode !== 200 || !counted) {\n    const why = r.error ? String(r.error.message ?? r.error).slice(0, 120) : `HTTP ${r.statusCode ?? 'none'}`;\n    attack = { status: 'fail', detail: `attack suite gave no scorecard (${why})` };\n  } else if (b.total < min || b.blocked + b.missed.length !== b.total) {\n    attack = { status: 'fail', detail: `attack suite ran ${b.total} case(s), expected at least ${min} and blocked + missed = total` };\n  } else if (b.missed.length) {\n    attack = { status: 'fail', detail: `${b.blocked}/${b.total} blocked, got through: ${b.missed.slice(0, 10).map(String).join(', ')}` };\n  } else {\n    attack = { status: 'pass', detail: `${b.blocked}/${b.total} blocked` };\n  }\n} else if (demo !== null) {\n  attack = demo === 'attack_miss'\n    ? { status: 'fail', detail: '19/22 blocked, got through: ATK-004, ATK-011, ATK-019 (simulated)' }\n    : { status: 'pass', detail: '22/22 blocked (simulated)' };\n}\nconst ok = audit.every((a) => a.ok) && attack.status !== 'fail';\nconst now = new Date().toISOString();\nif (ok) {\n  state.last_ok = now;\n  for (const a of audit) state[counts][a.company_id] = a.entries;\n}\nconst summary = [\n  ...(demo !== null ? ['DEMO MODE: simulated data, nothing real was checked'] : []),\n  ok ? 'Integrity run: OK' : 'Integrity run: FAILED',\n  ...audit.map((a) => `audit company ${a.company_id}: ${a.ok ? 'OK' : 'FAIL'} - ${a.detail}`),\n  `attacks: ${attack.detail}`,\n].join('\\n');\nreturn [{ json: { ok, demo: demo !== null, checked_at: now, audit, attack, summary } }];"
+        "jsCode": "const env = (k) => { try { return String($env[k] ?? ''); } catch (e) { return ''; } };  // '' when unset or blocked\n// Builds the scorecard. n8n decides nothing about payments here; it only reports what the services answered.\nconst audit = $('Audit verdicts').first().json.audit;\nconst state = $getWorkflowStaticData('global');\n// demo = standalone mode: the audit answers were simulated by \"Demo audit verdict\" (null when the gateway is connected).\nconst demo = $('Demo audit verdict').isExecuted ? $('Demo audit verdict').first().json.simulate : null;\nconst counts = demo === null ? 'entries' : 'entries_demo';  // simulated counts never mix with real ones\nstate[counts] = state[counts] ?? {};\n// A hash chain proves rows were not edited; it cannot show that the newest rows were deleted. The entry\n// count from the last good run can: it must never go down.\nfor (const a of audit) {\n  // Test runs in the editor do not keep state, so the simulated log always starts from 12 entries.\n  const before = state[counts][a.company_id] ?? (demo !== null ? 12 : undefined);\n  if (a.ok && Number.isInteger(before) && a.entries < before) {\n    a.ok = false;\n    a.detail = `audit log shrank from ${before} to ${a.entries} entries (rows deleted)`;\n  }\n}\nlet attack = { status: 'not_configured', detail: 'attack suite not configured (N8N_ATTACK_RUN_URL is empty): NOT checked' };\nif ($('Run attack suite').isExecuted) {\n  const r = $('Run attack suite').first().json;\n  const b = r.body ?? {};\n  const min = Number(env('N8N_ATTACK_MIN_CASES') || 1);\n  const counted = [b.total, b.blocked].every(Number.isInteger) && Array.isArray(b.missed);\n  if (r.statusCode !== 200 || !counted) {\n    const why = r.error ? String(r.error.message ?? r.error).slice(0, 120) : `HTTP ${r.statusCode ?? 'none'}`;\n    attack = { status: 'fail', detail: `attack suite gave no scorecard (${why})` };\n  } else if (b.total < min || b.blocked + b.missed.length !== b.total) {\n    attack = { status: 'fail', detail: `attack suite ran ${b.total} case(s), expected at least ${min} and blocked + missed = total` };\n  } else if (b.missed.length) {\n    attack = { status: 'fail', detail: `${b.blocked}/${b.total} blocked, got through: ${b.missed.slice(0, 10).map(String).join(', ')}` };\n  } else {\n    attack = { status: 'pass', detail: `${b.blocked}/${b.total} blocked` };\n  }\n} else if (demo !== null) {\n  attack = demo === 'attack_miss'\n    ? { status: 'fail', detail: '19/22 blocked, got through: ATK-004, ATK-011, ATK-019 (simulated)' }\n    : { status: 'pass', detail: '22/22 blocked (simulated)' };\n}\nconst ok = audit.every((a) => a.ok) && attack.status !== 'fail';\nconst now = new Date().toISOString();\nif (ok) {\n  state.last_ok = now;\n  for (const a of audit) state[counts][a.company_id] = a.entries;\n}\nconst summary = [\n  ...(demo !== null ? ['DEMO MODE: simulated data, nothing real was checked'] : []),\n  ok ? 'Integrity run: OK' : 'Integrity run: FAILED',\n  ...audit.map((a) => `audit company ${a.company_id}: ${a.ok ? 'OK' : 'FAIL'} - ${a.detail}`),\n  `attacks: ${attack.detail}`,\n].join('\\n');\nconst html = (t) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\nconst heartbeat_url = demo === null ? env('N8N_HEARTBEAT_URL') : '';  // a simulated OK never pings the outside monitor\nreturn [{ json: { ok, demo: demo !== null, checked_at: now, audit, attack, summary, text: html(summary), heartbeat_url } }];"
       },
       "id": "c8",
       "name": "Scorecard",
@@ -228,6 +276,51 @@
       "position": [
         1320,
         0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $('Test form').isExecuted }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "c19",
+      "name": "Started from test form?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1430,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { formSubmittedText: $json.summary } }}",
+        "options": {}
+      },
+      "id": "c20",
+      "name": "Show result on screen",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1650,
+        260
       ]
     },
     {
@@ -263,7 +356,7 @@
     {
       "parameters": {
         "method": "GET",
-        "url": "={{ (!$json.demo && $env.N8N_HEARTBEAT_URL) || 'http://localhost:5678/healthz' }}",
+        "url": "={{ $json.heartbeat_url || 'http://localhost:5678/healthz' }}",
         "options": {
           "timeout": 10000
         }
@@ -289,6 +382,51 @@
       "position": [
         1980,
         -100
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $('Run now (demo)').isExecuted }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "c21",
+      "name": "Called by Run now?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        2200,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "c22",
+      "name": "Answer Run now",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        2420,
+        -200
       ]
     },
     {
@@ -465,8 +603,37 @@
         ]
       ]
     },
+    "Test form": {
+      "main": [
+        [
+          {
+            "node": "Companies",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
     "Scorecard": {
       "main": [
+        [
+          {
+            "node": "Started from test form?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Started from test form?": {
+      "main": [
+        [
+          {
+            "node": "Show result on screen",
+            "type": "main",
+            "index": 0
+          }
+        ],
         [
           {
             "node": "All OK?",
@@ -499,6 +666,28 @@
         [
           {
             "node": "Return scorecard",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Return scorecard": {
+      "main": [
+        [
+          {
+            "node": "Called by Run now?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Called by Run now?": {
+      "main": [
+        [
+          {
+            "node": "Answer Run now",
             "type": "main",
             "index": 0
           }

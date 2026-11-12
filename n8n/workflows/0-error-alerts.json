@@ -15,7 +15,66 @@
     },
     {
       "parameters": {
-        "jsCode": "// One alert format for failures in every SecureFin workflow. Error text is cut short and escaped.\nconst j = $input.first().json;\nconst html = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\nconst name = j.workflow?.name ?? 'unknown workflow';\nconst where = j.execution?.lastNodeExecuted ?? j.trigger?.error?.node?.name ?? 'trigger';\nconst message = String(j.execution?.error?.message ?? j.trigger?.error?.message ?? 'no error message').slice(0, 600);\nconst plain = [`SecureFin automation alert / تنبيه`, `Workflow: ${name}`, `Step: ${where}`, '', message,\n  ...(j.execution?.url ? ['', j.execution.url] : [])].join('\\n');\nreturn [{ json: { subject: `SecureFin alert: ${name}`, plain, text: html(plain) } }];"
+        "path": "securefin-test-alert",
+        "formTitle": "Test 0: error alert",
+        "formDescription": "Pretend one of the workflows failed. The alert text is built and shown here. Nothing is sent.",
+        "formFields": {
+          "values": [
+            {
+              "fieldName": "workflow_name",
+              "fieldLabel": "Which workflow failed?",
+              "fieldType": "dropdown",
+              "requiredField": true,
+              "defaultValue": "1 Invoice email intake",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "1 Invoice email intake"
+                  },
+                  {
+                    "option": "2 Decision notifications"
+                  },
+                  {
+                    "option": "3 Nightly integrity run"
+                  }
+                ]
+              }
+            },
+            {
+              "fieldName": "step",
+              "fieldLabel": "Step that failed",
+              "fieldType": "text",
+              "requiredField": true,
+              "defaultValue": "Upload to API"
+            },
+            {
+              "fieldName": "error_message",
+              "fieldLabel": "Error message",
+              "fieldType": "textarea",
+              "requiredField": true,
+              "defaultValue": "Invoice intake: 1 file(s) not uploaded after 3 tries."
+            }
+          ]
+        },
+        "responseMode": "responseNode",
+        "options": {
+          "buttonLabel": "Run",
+          "customCss": "#submitted-content { white-space: pre-line; text-align: start; unicode-bidi: plaintext; }"
+        }
+      },
+      "id": "e5",
+      "name": "Test form",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        200
+      ],
+      "webhookId": "securefin-test-alert"
+    },
+    {
+      "parameters": {
+        "jsCode": "// One alert format for failures in every SecureFin workflow. Error text is cut short and escaped.\nconst f = $('Test form').isExecuted ? $('Test form').first().json : null;  // test form: a pretend failure\nconst j = f ? { workflow: { name: f['Which workflow failed?'] }, execution: { lastNodeExecuted: f['Step that failed'], error: { message: f['Error message'] } } }\n  : $input.first().json;\nconst html = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\nconst name = j.workflow?.name ?? 'unknown workflow';\nconst where = j.execution?.lastNodeExecuted ?? j.trigger?.error?.node?.name ?? 'trigger';\nconst message = String(j.execution?.error?.message ?? j.trigger?.error?.message ?? 'no error message').slice(0, 600);\nconst plain = [`SecureFin automation alert / تنبيه`, `Workflow: ${name}`, `Step: ${where}`, '', message,\n  ...(j.execution?.url ? ['', j.execution.url] : [])].join('\\n');\nreturn [{ json: { subject: `SecureFin alert: ${name}`, plain, text: html(plain) } }];"
       },
       "id": "e2",
       "name": "Build alert",
@@ -24,6 +83,51 @@
       "position": [
         220,
         0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $('Test form').isExecuted }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "e6",
+      "name": "Started from test form?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { formSubmittedText: $json.plain } }}",
+        "options": {}
+      },
+      "id": "e7",
+      "name": "Show result on screen",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        660,
+        -100
       ]
     },
     {
@@ -41,8 +145,8 @@
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
       "position": [
-        440,
-        0
+        660,
+        100
       ],
       "credentials": {
         "telegramApi": {
@@ -71,8 +175,8 @@
       "type": "n8n-nodes-base.emailSend",
       "typeVersion": 2.1,
       "position": [
-        660,
-        100
+        880,
+        200
       ],
       "credentials": {
         "smtp": {
@@ -94,8 +198,37 @@
         ]
       ]
     },
+    "Test form": {
+      "main": [
+        [
+          {
+            "node": "Build alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
     "Build alert": {
       "main": [
+        [
+          {
+            "node": "Started from test form?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Started from test form?": {
+      "main": [
+        [
+          {
+            "node": "Show result on screen",
+            "type": "main",
+            "index": 0
+          }
+        ],
         [
           {
             "node": "Telegram",

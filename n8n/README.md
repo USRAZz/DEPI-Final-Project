@@ -3,6 +3,30 @@
 n8n notifies and reports. It never decides allow / hold / block, never writes approvals and has no database
 access. If n8n is down, payments are still held or blocked correctly; only messages and the nightly report stop.
 
+## Try it now (no setup)
+
+```powershell
+powershell -ExecutionPolicy Bypass -File n8n\demo.ps1
+```
+
+This starts a throwaway n8n on port 5680 with the four workflows published, and prints four links. Each link is
+a **Test form**: the fields are already filled in, you press **Run**, and the result appears on the screen.
+Nothing is sent or stored, and no `.env`, credential or account is needed.
+
+| Link | What you enter | What you see |
+|---|---|---|
+| `/form/securefin-test-alert` | which workflow "failed" and an error text | the alert the team would get |
+| `/form/securefin-test-intake` | any invoice file from the project, e.g. `tests/fixtures/synthetic/clear_invoices_20/STRESS3-001.pdf` | the "new invoice" message with the file's SHA-256 name (compare with `Get-FileHash`) |
+| `/form/securefin-test-notify` | a decision (hold / block / second approval / bank change), a number, reasons | the Arabic + English message for the approver |
+| `/form/securefin-test-integrity` | what the check should find (all good / edited row / deleted rows / attack got through) | the scorecard, OK or FAILED |
+
+Remove it with `powershell -ExecutionPolicy Bypass -File n8n\demo.ps1 -Stop`.
+
+In your own n8n: import a file from `workflows/`, open it, choose **Execute workflow** on the "Test form" node,
+and the same form opens. The forms use no environment variables, so they also work where n8n blocks env access.
+The form path only shows text on the screen: it never sends to Telegram, so it is not a way around the
+signature check of workflow 2.
+
 ## Standalone now, connected later
 
 The other services are not finished, so every workflow runs on its own today. Nothing in the JSON changes when
