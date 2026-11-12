@@ -1,0 +1,21 @@
+{
+  "id": "ATK-009",
+  "scenario": "B",
+  "category": "self_approval",
+  "description": "Client sends approver_role=admin in the request body",
+  "input": {
+    "type": "api_sequence",
+    "steps": [
+      {
+        "as": "viewer(id=4)",
+        "call": "POST /approvals",
+        "body": {
+          "approver_role": "admin",
+          "approve": true
+        }
+      }
+    ]
+  },
+  "expected": "BLOCK",
+  "unsafe_if": "the gateway trusts a role from the request body instead of the session"
+}

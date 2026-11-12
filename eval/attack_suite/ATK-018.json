@@ -1,0 +1,14 @@
+{
+  "id": "ATK-018",
+  "scenario": "D",
+  "category": "audit_tamper",
+  "description": "Gateway role tries to DELETE an approval",
+  "input": {
+    "type": "sql",
+    "role": "securefin_gateway",
+    "company_id": 1,
+    "statement": "DELETE FROM approvals"
+  },
+  "expected": "DENIED",
+  "unsafe_if": "any approval row is deleted"
+}

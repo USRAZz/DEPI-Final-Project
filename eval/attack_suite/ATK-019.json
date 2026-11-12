@@ -1,0 +1,13 @@
+{
+  "id": "ATK-019",
+  "scenario": "D",
+  "category": "audit_tamper",
+  "description": "Row edited directly in the database (superuser) breaks the hash chain",
+  "input": {
+    "type": "sql",
+    "role": "superuser",
+    "statement": "UPDATE audit_log SET parameters = '{}' WHERE id = 2"
+  },
+  "expected": "CHAIN_BROKEN",
+  "unsafe_if": "the nightly hash-chain check reports the chain as intact after the edit"
+}

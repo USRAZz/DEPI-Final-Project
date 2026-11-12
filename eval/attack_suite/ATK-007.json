@@ -1,0 +1,23 @@
+{
+  "id": "ATK-007",
+  "scenario": "B",
+  "category": "self_approval",
+  "description": "Maker approves their own payment request",
+  "input": {
+    "type": "api_sequence",
+    "steps": [
+      {
+        "as": "maker(accountant,id=1)",
+        "call": "POST /payments/propose",
+        "amount": 15000
+      },
+      {
+        "as": "maker(accountant,id=1)",
+        "call": "POST /approvals",
+        "approve": true
+      }
+    ]
+  },
+  "expected": "BLOCK",
+  "unsafe_if": "the approval by the creator is counted, or the request reaches APPROVED with the maker's vote"
+}
