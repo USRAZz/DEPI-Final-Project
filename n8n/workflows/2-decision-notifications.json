@@ -4,6 +4,7 @@
   "nodes": [
     {
       "parameters": {
+        "path": "securefin-test-notify",
         "formTitle": "Test 2: decision notification",
         "formDescription": "Pick a decision the gateway could make. The workflow builds the Arabic + English message an approver would get and shows it here. Nothing is sent.",
         "formFields": {
@@ -47,16 +48,16 @@
             }
           ]
         },
-        "responseMode": "onReceived",
+        "responseMode": "responseNode",
         "options": {
-          "path": "securefin-test-notify",
-          "buttonLabel": "Run"
+          "buttonLabel": "Run",
+          "customCss": "#submitted-content { white-space: pre-line; text-align: start; unicode-bidi: plaintext; }"
         }
       },
       "id": "b12",
       "name": "Test form",
       "type": "n8n-nodes-base.formTrigger",
-      "typeVersion": 2.4,
+      "typeVersion": 2.1,
       "position": [
         1100,
         -300
@@ -65,7 +66,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Test form -> the same event shape the gateway will send. The form path only shows the message on\n// screen; it never sends it, so it is not a way around the signature check.\nconst f = $input.first().json;\nconst type = String(f.event_type).split(' ')[0];\nconst id = Math.max(1, Math.floor(Number(f.id) || 1));\nconst vendor = type === 'bank_change_pending';\nconst reasons = String(f.reasons ?? '').split(',').map((s) => s.trim()).filter(Boolean);\nreturn [{ json: { valid: true, event: {\n  event_id: `form-${$execution.id}`, event_type: type, company_id: 1,\n  payment_request_id: vendor ? null : id, vendor_id: vendor ? id : null, reasons, expires_at: null,\n} } }];"
+        "jsCode": "// Test form -> the same event shape the gateway will send. The form path only shows the message on\n// screen; it never sends it, so it is not a way around the signature check.\nconst f = $input.first().json;\nconst type = String(f['Decision']).split(' ')[0];\nconst id = Math.max(1, Math.floor(Number(f['Payment request number (or vendor number for a bank change)']) || 1));\nconst vendor = type === 'bank_change_pending';\nconst reasons = String(f['Reasons, separated by commas'] ?? '').split(',').map((s) => s.trim()).filter(Boolean);\nreturn [{ json: { valid: true, event: {\n  event_id: `form-${$execution.id}`, event_type: type, company_id: 1,\n  payment_request_id: vendor ? null : id, vendor_id: vendor ? id : null, reasons, expires_at: null,\n} } }];"
       },
       "id": "b13",
       "name": "Form to event",
@@ -267,16 +268,14 @@
     },
     {
       "parameters": {
-        "operation": "completion",
-        "respondWith": "text",
-        "completionTitle": "This is the message the approver would get",
-        "completionMessage": "={{ $json.text.replace(/\\n/g, '<br>') }}",
+        "respondWith": "json",
+        "responseBody": "={{ { formSubmittedText: $json.plain } }}",
         "options": {}
       },
       "id": "b15",
       "name": "Show result on screen",
-      "type": "n8n-nodes-base.form",
-      "typeVersion": 2.5,
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
       "position": [
         1980,
         -180

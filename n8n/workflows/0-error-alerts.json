@@ -15,6 +15,7 @@
     },
     {
       "parameters": {
+        "path": "securefin-test-alert",
         "formTitle": "Test 0: error alert",
         "formDescription": "Pretend one of the workflows failed. The alert text is built and shown here. Nothing is sent.",
         "formFields": {
@@ -55,16 +56,16 @@
             }
           ]
         },
-        "responseMode": "onReceived",
+        "responseMode": "responseNode",
         "options": {
-          "path": "securefin-test-alert",
-          "buttonLabel": "Run"
+          "buttonLabel": "Run",
+          "customCss": "#submitted-content { white-space: pre-line; text-align: start; unicode-bidi: plaintext; }"
         }
       },
       "id": "e5",
       "name": "Test form",
       "type": "n8n-nodes-base.formTrigger",
-      "typeVersion": 2.4,
+      "typeVersion": 2.1,
       "position": [
         0,
         200
@@ -73,7 +74,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// One alert format for failures in every SecureFin workflow. Error text is cut short and escaped.\nconst f = $('Test form').isExecuted ? $('Test form').first().json : null;  // test form: a pretend failure\nconst j = f ? { workflow: { name: f.workflow_name }, execution: { lastNodeExecuted: f.step, error: { message: f.error_message } } }\n  : $input.first().json;\nconst html = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\nconst name = j.workflow?.name ?? 'unknown workflow';\nconst where = j.execution?.lastNodeExecuted ?? j.trigger?.error?.node?.name ?? 'trigger';\nconst message = String(j.execution?.error?.message ?? j.trigger?.error?.message ?? 'no error message').slice(0, 600);\nconst plain = [`SecureFin automation alert / تنبيه`, `Workflow: ${name}`, `Step: ${where}`, '', message,\n  ...(j.execution?.url ? ['', j.execution.url] : [])].join('\\n');\nreturn [{ json: { subject: `SecureFin alert: ${name}`, plain, text: html(plain) } }];"
+        "jsCode": "// One alert format for failures in every SecureFin workflow. Error text is cut short and escaped.\nconst f = $('Test form').isExecuted ? $('Test form').first().json : null;  // test form: a pretend failure\nconst j = f ? { workflow: { name: f['Which workflow failed?'] }, execution: { lastNodeExecuted: f['Step that failed'], error: { message: f['Error message'] } } }\n  : $input.first().json;\nconst html = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\nconst name = j.workflow?.name ?? 'unknown workflow';\nconst where = j.execution?.lastNodeExecuted ?? j.trigger?.error?.node?.name ?? 'trigger';\nconst message = String(j.execution?.error?.message ?? j.trigger?.error?.message ?? 'no error message').slice(0, 600);\nconst plain = [`SecureFin automation alert / تنبيه`, `Workflow: ${name}`, `Step: ${where}`, '', message,\n  ...(j.execution?.url ? ['', j.execution.url] : [])].join('\\n');\nreturn [{ json: { subject: `SecureFin alert: ${name}`, plain, text: html(plain) } }];"
       },
       "id": "e2",
       "name": "Build alert",
@@ -116,16 +117,14 @@
     },
     {
       "parameters": {
-        "operation": "completion",
-        "respondWith": "text",
-        "completionTitle": "This is the alert the team would get",
-        "completionMessage": "={{ $json.text.replace(/\\n/g, '<br>') }}",
+        "respondWith": "json",
+        "responseBody": "={{ { formSubmittedText: $json.plain } }}",
         "options": {}
       },
       "id": "e7",
       "name": "Show result on screen",
-      "type": "n8n-nodes-base.form",
-      "typeVersion": 2.5,
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
       "position": [
         660,
         -100

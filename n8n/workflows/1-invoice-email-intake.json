@@ -4,6 +4,7 @@
   "nodes": [
     {
       "parameters": {
+        "path": "securefin-test-intake",
         "formTitle": "Test 1: invoice intake",
         "formDescription": "Upload any invoice file from the project (for example tests/fixtures/synthetic/clear_invoices_20/STRESS3-001.pdf). The workflow hashes it, names it by its SHA-256 and shows the message it would send. Nothing is stored or sent.",
         "formFields": {
@@ -25,16 +26,16 @@
             }
           ]
         },
-        "responseMode": "onReceived",
+        "responseMode": "responseNode",
         "options": {
-          "path": "securefin-test-intake",
-          "buttonLabel": "Run"
+          "buttonLabel": "Run",
+          "customCss": "#submitted-content { white-space: pre-line; text-align: start; unicode-bidi: plaintext; }"
         }
       },
       "id": "a0",
       "name": "Test form",
       "type": "n8n-nodes-base.formTrigger",
-      "typeVersion": 2.4,
+      "typeVersion": 2.1,
       "position": [
         0,
         220
@@ -68,7 +69,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// One item per invoice attachment. The type comes from the MIME type the mail client declared; the API\n// checks the real file bytes and enforces the size limit (413), so there is one limit, in one place.\nconst EXT = { 'application/pdf': 'pdf', 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp', 'image/tiff': 'tif' };\nconst MAX_PER_EMAIL = 5;\nconst out = [];\nfor (const item of $input.all()) {\n  const j = item.json;\n  const from = typeof j.from === 'string' ? j.from : (j.from?.value?.[0]?.address ?? j.sender_email ?? '');  // sender_email: test form\n  const sender = (from.match(/[^\\s<>\"]+@[^\\s<>\"]+/) ?? [''])[0].toLowerCase();\n  // Message-ID is chosen by the sender, so it is only ever used hashed (see \"Idempotency key\").\n  const messageId = String(j.messageId ?? j.metadata?.['message-id'] ?? `uid-${j.attributes?.uid ?? ''}`);\n  let kept = 0;\n  for (const bin of Object.values(item.binary ?? {})) {\n    const ext = EXT[(bin.mimeType ?? '').toLowerCase()];\n    if (!ext || kept >= MAX_PER_EMAIL) continue;\n    kept += 1;\n    out.push({ json: { sender, message_id: messageId, ext }, binary: { file: bin } });\n  }\n}\nreturn out;"
+        "jsCode": "// One item per invoice attachment. The type comes from the MIME type the mail client declared; the API\n// checks the real file bytes and enforces the size limit (413), so there is one limit, in one place.\nconst EXT = { 'application/pdf': 'pdf', 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp', 'image/tiff': 'tif' };\nconst MAX_PER_EMAIL = 5;\nconst out = [];\nfor (const item of $input.all()) {\n  const j = item.json;\n  const from = typeof j.from === 'string' ? j.from : (j.from?.value?.[0]?.address ?? j['Sender email (any address)'] ?? '');  // the second one: test form\n  const sender = (from.match(/[^\\s<>\"]+@[^\\s<>\"]+/) ?? [''])[0].toLowerCase();\n  // Message-ID is chosen by the sender, so it is only ever used hashed (see \"Idempotency key\").\n  const messageId = String(j.messageId ?? j.metadata?.['message-id'] ?? `uid-${j.attributes?.uid ?? ''}`);\n  let kept = 0;\n  for (const bin of Object.values(item.binary ?? {})) {\n    const ext = EXT[(bin.mimeType ?? '').toLowerCase()];\n    if (!ext || kept >= MAX_PER_EMAIL) continue;\n    kept += 1;\n    out.push({ json: { sender, message_id: messageId, ext }, binary: { file: bin } });\n  }\n}\nreturn out;"
       },
       "id": "a2",
       "name": "Keep invoice attachments",
@@ -282,16 +283,14 @@
     },
     {
       "parameters": {
-        "operation": "completion",
-        "respondWith": "text",
-        "completionTitle": "Invoice received: this is the message the team would get",
-        "completionMessage": "={{ $json.text.replace(/\\n/g, '<br>') }}",
+        "respondWith": "json",
+        "responseBody": "={{ { formSubmittedText: $json.plain } }}",
         "options": {}
       },
       "id": "a15",
       "name": "Show result on screen",
-      "type": "n8n-nodes-base.form",
-      "typeVersion": 2.5,
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
       "position": [
         1980,
         160

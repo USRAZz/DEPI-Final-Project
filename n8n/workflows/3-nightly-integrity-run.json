@@ -4,6 +4,7 @@
   "nodes": [
     {
       "parameters": {
+        "path": "securefin-test-integrity",
         "formTitle": "Test 3: integrity run",
         "formDescription": "Choose what the nightly check should find. While the gateway is not connected the answers are simulated, and the report says so. The result is shown here; no alert is sent.",
         "formFields": {
@@ -33,16 +34,16 @@
             }
           ]
         },
-        "responseMode": "onReceived",
+        "responseMode": "responseNode",
         "options": {
-          "path": "securefin-test-integrity",
-          "buttonLabel": "Run"
+          "buttonLabel": "Run",
+          "customCss": "#submitted-content { white-space: pre-line; text-align: start; unicode-bidi: plaintext; }"
         }
       },
       "id": "c18",
       "name": "Test form",
       "type": "n8n-nodes-base.formTrigger",
-      "typeVersion": 2.4,
+      "typeVersion": 2.1,
       "position": [
         0,
         200
@@ -74,7 +75,7 @@
         "httpMethod": "POST",
         "path": "securefin/integrity-run",
         "authentication": "headerAuth",
-        "responseMode": "lastNode",
+        "responseMode": "responseNode",
         "options": {}
       },
       "id": "c2",
@@ -138,7 +139,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Standalone mode (N8N_AUDIT_VERIFY_URL is empty): the gateway is not connected yet. This node answers in the\n// gateway's format with SIMULATED data so the rest of the workflow can be shown. Nothing real is checked and\n// the scorecard says so. Choose what to simulate in the Test form, or call the \"Run now\" webhook with\n// {\"simulate\": \"...\"}:   broken_chain | deleted_rows | attack_miss   (anything else = all good)\nconst body = $('Run now (demo)').isExecuted ? ($('Run now (demo)').first().json.body ?? {}) : {};\nconst picked = $('Test form').isExecuted ? String($('Test form').first().json.scenario ?? '').split(' ')[0] : body.simulate;\nconst simulate = ['broken_chain', 'deleted_rows', 'attack_miss'].includes(picked) ? picked : 'none';\nreturn $input.all().map((item, i) => ({\n  json: {\n    simulate,\n    statusCode: 200,\n    body: {\n      ok: simulate !== 'broken_chain',\n      company_id: item.json.company_id,\n      entries: simulate === 'deleted_rows' ? 5 : 12,\n      first_broken_index: simulate === 'broken_chain' ? 6 : null,\n      first_broken_id: simulate === 'broken_chain' ? 7 : null,\n      head_hash: null,\n    },\n  },\n  pairedItem: i,\n}));"
+        "jsCode": "// Standalone mode (N8N_AUDIT_VERIFY_URL is empty): the gateway is not connected yet. This node answers in the\n// gateway's format with SIMULATED data so the rest of the workflow can be shown. Nothing real is checked and\n// the scorecard says so. Choose what to simulate in the Test form, or call the \"Run now\" webhook with\n// {\"simulate\": \"...\"}:   broken_chain | deleted_rows | attack_miss   (anything else = all good)\nconst body = $('Run now (demo)').isExecuted ? ($('Run now (demo)').first().json.body ?? {}) : {};\nconst picked = $('Test form').isExecuted ? String($('Test form').first().json['What should the check find?'] ?? '').split(' ')[0] : body.simulate;\nconst simulate = ['broken_chain', 'deleted_rows', 'attack_miss'].includes(picked) ? picked : 'none';\nreturn $input.all().map((item, i) => ({\n  json: {\n    simulate,\n    statusCode: 200,\n    body: {\n      ok: simulate !== 'broken_chain',\n      company_id: item.json.company_id,\n      entries: simulate === 'deleted_rows' ? 5 : 12,\n      first_broken_index: simulate === 'broken_chain' ? 6 : null,\n      first_broken_id: simulate === 'broken_chain' ? 7 : null,\n      head_hash: null,\n    },\n  },\n  pairedItem: i,\n}));"
       },
       "id": "c17",
       "name": "Demo audit verdict",
@@ -309,16 +310,14 @@
     },
     {
       "parameters": {
-        "operation": "completion",
-        "respondWith": "text",
-        "completionTitle": "={{ $json.ok ? 'Integrity run: OK' : 'Integrity run: FAILED (this is what the alert would say)' }}",
-        "completionMessage": "={{ $json.text.replace(/\\n/g, '<br>') }}",
+        "respondWith": "json",
+        "responseBody": "={{ { formSubmittedText: $json.summary } }}",
         "options": {}
       },
       "id": "c20",
       "name": "Show result on screen",
-      "type": "n8n-nodes-base.form",
-      "typeVersion": 2.5,
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
       "position": [
         1650,
         260
@@ -383,6 +382,51 @@
       "position": [
         1980,
         -100
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $('Run now (demo)').isExecuted }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "c21",
+      "name": "Called by Run now?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        2200,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "c22",
+      "name": "Answer Run now",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        2420,
+        -200
       ]
     },
     {
@@ -622,6 +666,28 @@
         [
           {
             "node": "Return scorecard",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Return scorecard": {
+      "main": [
+        [
+          {
+            "node": "Called by Run now?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Called by Run now?": {
+      "main": [
+        [
+          {
+            "node": "Answer Run now",
             "type": "main",
             "index": 0
           }
