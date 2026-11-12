@@ -101,6 +101,16 @@ def test_iban_and_tax_id_are_read_by_code_and_never_sent_to_the_llm(tmp_path):
     assert r.fields.iban == "EG380019000500000000263180002" and r.fields.tax_id == "123456789"
 
 
+def test_invalid_iban_on_the_invoice_is_flagged(tmp_path):
+    inv = tmp_path / "inv.txt"
+    inv.write_text("Nile Office invoice A-1 total 114 EGP\nIBAN: EG38 0019 0005 0000 0000 2631 8000 3",
+                   encoding="utf-8")
+    r = pipeline.process_invoice(inv, llm_extract=CapturingLLM({**FIELDS, "iban": None}),
+                                 llm_categorize=FakeLLM(CATEGORY), seen={})
+    assert r.fields.iban == "EG380019000500000000263180003"
+    assert "IBAN_CHECKSUM_INVALID" in r.issue_codes
+
+
 def test_paddle_output_is_merged_from_both_models(monkeypatch):
     class Res:
         def __init__(self, payload):
