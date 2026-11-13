@@ -221,3 +221,15 @@ Descriptions gain clearly. The vendor changes go both ways (4 won, 7 lost) altho
 | Subtotal (PaddleOCR / + QARI) | 41 / 40 | 39 / 39 |
 
 The other fields move by one or two hits, which is the same size as the run-to-run variation seen above. Two pages still take the banner in both runs (STRESS2-003, -012). On STRESS2-027 v2 now copies an OCR typo exactly (`بدابة`), the cost of "as written". The same eval found that `pipeline.process_invoice` does not catch `RuntimeError("empty reply ...")` from `ai_core/llm.py` (the model ran out of tokens), so that error escapes the pipeline instead of returning `FAILED`. The eval scripts now score such a run as all fields wrong.
+
+**Qari-OCR 0.4.0 and its base model (2026-11-14).** `NAMAA-Space/Qari-OCR-0.4.0-VL-4B-Instruct` is a LoRA adapter on `unsloth/Qwen3-VL-4B-Instruct`. It was tested the same way as v0.3: body region of the embedded scan, amount tokens dropped, on the 26 pages where PaddleOCR missed descriptions.
+
+| 26 pages | All fields | Descriptions | Time per page |
+|---|---:|---:|---:|
+| PaddleOCR only | 455/518 | 11/71 | |
+| + QARI v0.3 (2B, current opt-in) | 474/518 | 30/71 | 10.9 s |
+| + Qari 0.4.0 (adapter), fp16 | 455/518 | 11/71 | 85 s, output is `QUESTION` repeated |
+| + Qari 0.4.0 (adapter), bf16, prompt "Free OCR." or the v0.3 prompt | no gain | 0 | 88 s, reads the header row, then repeats `175.00` until the token limit |
+| + **Qwen3-VL-4B base, no adapter**, bf16 | **481/518** | **37/71** | 10.4 s |
+
+The 0.4.0 adapter was trained on book pages and loops on item tables, so it is not usable here. Its base model reads the whole table, with small letter errors (`نصوير` for `تصوير`), and finds 7 more descriptions than v0.3 at the same speed. No non-description field changed. Qwen3 models need bf16; fp16 overflows. Not adopted yet. Before switching, the LLM extraction step must be measured on its text (precision and invented words, as for v0.3), and it needs about 9 GB of GPU memory against 4.5 GB, plus a different model class (`Qwen3VLForConditionalGeneration`).
