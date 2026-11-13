@@ -44,6 +44,25 @@ jobs:
           count=0; for r in $revs; do echo "$downs" | grep -qx "$r" || count=$((count+1)); done
           echo "heads: $count"; [ "$count" -le 1 ]
 
+  migrations-postgres:
+    # Upgrades an empty PostgreSQL, checks row-level security, then downgrades.
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env: { POSTGRES_PASSWORD: test }
+        ports: ["5432:5432"]
+        options: --health-cmd pg_isready --health-interval 5s --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgresql+psycopg://postgres:test@localhost:5432/postgres
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install ./contracts -r services/api/requirements-dev.txt -r services/gateway/requirements-dev.txt
+      - run: cd services/api && pytest -q tests/test_migrations.py
+      - run: cd services/gateway && pytest -q tests/test_db_store_audit.py
+
   frontend:
     runs-on: ubuntu-latest
     steps:

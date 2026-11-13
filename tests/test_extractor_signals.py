@@ -101,23 +101,95 @@ def test_iban_and_tax_id_are_read_by_code_and_never_sent_to_the_llm(tmp_path):
     assert r.fields.iban == "EG380019000500000000263180002" and r.fields.tax_id == "123456789"
 
 
+def test_invalid_iban_on_the_invoice_is_flagged(tmp_path):
+    inv = tmp_path / "inv.txt"
+    inv.write_text("Nile Office invoice A-1 total 114 EGP\nIBAN: EG38 0019 0005 0000 0000 2631 8000 3",
+                   encoding="utf-8")
+    r = pipeline.process_invoice(inv, llm_extract=CapturingLLM({**FIELDS, "iban": None}),
+                                 llm_categorize=FakeLLM(CATEGORY), seen={})
+    assert r.fields.iban == "EG380019000500000000263180003"
+    assert "IBAN_CHECKSUM_INVALID" in r.issue_codes
+
+
 def test_paddle_output_is_merged_from_both_models(monkeypatch):
-    class Res:
-        def __init__(self, payload):
-            self.json = {"res": payload}
-
-    class Model:
-        def __init__(self, payload):
-            self.payload = payload
-
-        def predict(self, arr):
-            return [Res(self.payload)]
-
     models = {
-        "ar": Model({"rec_texts": ["مصنع", "النيل"], "rec_scores": [0.9, 0.8],
-                     "rec_boxes": [[0, 0, 10, 10], [20, 0, 30, 10]]}),
-        "en": Model({"rec_texts": ["INV-1"], "rec_scores": [1.0], "rec_boxes": [[0, 20, 10, 30]]}),
+        "ar": FakePaddle({"rec_texts": ["مصنع", "النيل"], "rec_scores": [0.9, 0.8],
+                          "rec_boxes": [[0, 0, 10, 10], [20, 0, 30, 10]]}),
+        "en": FakePaddle({"rec_texts": ["INV-1"], "rec_scores": [1.0], "rec_boxes": [[0, 20, 10, 30]]}),
     }
     monkeypatch.setattr(ocr, "_paddle_model", lambda lang: models[lang])
     text, conf = ocr._paddle(Image.new("RGB", (40, 40), "white"))
-    assert text == "النيل مصنع\nINV-1" and conf == 0.9
+    assert text == "النيل مصنع\nINV-1" and conf == 0.9  # header pass read the same words: no duplicates
+
+
+def test_header_pass_fixes_latin_letter_inside_arabic(monkeypatch):
+    full = {"rec_texts": ["مصiع"], "rec_scores": [0.7], "rec_boxes": [[0, 0, 10, 10]]}
+    header = {"rec_texts": ["مصنع"], "rec_scores": [0.95], "rec_boxes": [[0, 0, 10, 10]]}
+    models = {"ar": FakePaddle(full, header=header), "en": FakePaddle({"rec_texts": [], "rec_boxes": []})}
+    monkeypatch.setattr(ocr, "_paddle_model", lambda lang: models[lang])
+    text, _ = ocr._paddle(Image.new("RGB", (40, 40), "white"))
+    assert text == "مصنع"
+
+
+def test_header_words_do_not_replace_a_whole_phrase():
+    # STRESS3-013: the full page read one box, the crop read three word boxes, one of them surer
+    full = [("شركة المرسى للخدمات", [924, 238, 1176, 289], 0.974)]
+    crop = [("المرسى", [1019, 246, 1106, 285], 0.919), ("شركة", [1102, 245, 1170, 281], 0.996),
+            ("للخدمات", [932, 248, 1019, 277], 0.995)]
+    merged = ocr.merge_header(full, crop, page_height=1600)
+    assert [t for t, _ in merged] == ["شركة المرسى للخدمات"]
+
+
+def test_header_crop_needs_a_clear_margin():
+    # STRESS-022: the crop dropped a letter ('السنبة') but scored a little higher
+    full = [("شركة السنبلة للتجارة", [807, 247, 1000, 280], 0.953)]
+    crop = [("شركة السنبة للتجارة", [802, 242, 1003, 285], 0.983)]
+    assert [t for t, _ in ocr.merge_header(full, crop, page_height=1600)] == ["شركة السنبلة للتجارة"]
+
+
+def test_letters_inside_amounts_are_fixed():
+    assert ocr.fix_numbers("1,521.B0 EGP VAT 14%") == "1,521.80 EGP VAT 14%"
+    assert ocr.fix_numbers("INV-2026-0042 SO20260000001234") == "INV-2026-0042 SO20260000001234"
+
+
+def test_reread_only_when_an_arabic_table_line_is_weak():
+    def payload(score):  # one header word (ignored however weak) and one Arabic table line
+        return [{"rec_texts": ["شركة", "خمة صيانة"], "rec_scores": [0.1, score],
+                 "rec_boxes": [[0, 10, 50, 30], [0, 900, 50, 920]]}]
+    assert ocr.needs_reread(payload(0.6), page_height=1600)
+    assert not ocr.needs_reread(payload(0.95), page_height=1600)
+
+
+def test_qari_reread_is_added_after_paddle_text_only_when_enabled(monkeypatch):
+    empty = {"rec_texts": [], "rec_scores": [], "rec_boxes": []}
+    ar = FakePaddle({"rec_texts": ["خمة صيانة"], "rec_scores": [0.5], "rec_boxes": [[0, 30, 10, 38]]}, header=empty)
+    monkeypatch.setattr(ocr, "_paddle_model", lambda lang: ar if lang == "ar" else FakePaddle(empty))
+    monkeypatch.setattr(ocr, "qari_table_lines", lambda img: ["خدمة صيانة"])
+    monkeypatch.setenv("OCR_ARABIC_REREAD", "qari")
+    text, _ = ocr._paddle(Image.new("RGB", (40, 40), "white"))
+    assert text.splitlines() == ["خمة صيانة", ocr.REREAD_MARKER, "خدمة صيانة"]
+    monkeypatch.delenv("OCR_ARABIC_REREAD")
+    assert ocr._paddle(Image.new("RGB", (40, 40), "white"))[0] == "خمة صيانة"  # off by default
+
+
+def test_amount_tokens_are_dropped_from_the_second_reading():
+    line = "خدمة صيانة 5 1,250.00 6,250.00 ج.م"
+    assert " ".join(w for w in line.split() if not ocr._AMOUNT.fullmatch(w)) == "خدمة صيانة"
+
+
+class FakePaddle:
+    """Returns page-pixel boxes; for the 2x header crop it returns them in crop pixels, like PaddleOCR."""
+
+    def __init__(self, payload, header=None):
+        self.payload, self.header = payload, header or payload
+
+    def predict(self, arr):
+        if arr.shape[0] == 40:  # the full test page
+            return [_Res(self.payload)]
+        boxes = [[v * ocr.HEADER_SCALE for v in b] for b in self.header.get("rec_boxes", [])]
+        return [_Res({**self.header, "rec_boxes": boxes})]
+
+
+class _Res:
+    def __init__(self, payload):
+        self.json = {"res": payload}

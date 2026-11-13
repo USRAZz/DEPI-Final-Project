@@ -1,20 +1,32 @@
+import os
+
 from fastapi import FastAPI
-from securefin_contracts import AuthorizeRequest, Decision, ProposedAction, Role
 
-from .clients import gateway_authorize
-
-app = FastAPI(title="SecureFin API")
-
-
-@app.get("/health")
-def health():
-    return {"service": "api", "status": "ok"}
+from .gateway import Gateway, build_gateway
+from .risk_features import internal_router
+from .routes import router
+from .store import DataStore, seeded_store
 
 
-@app.post("/payments/propose")
-async def propose_payment(action: ProposedAction):
-    """Skeleton path: agent proposal -> gateway decision -> execute only on ALLOW. (Auth is stubbed.)"""
-    req = AuthorizeRequest(user_id=1, role=Role.ACCOUNTANT, company_id=1, action=action, request_id="demo-1")
-    decision = await gateway_authorize(req)
-    executed = decision.decision == Decision.ALLOW  # TODO(Karim): real simulated executor + HMAC re-check
-    return {"decision": decision.model_dump(), "executed": executed}
+def default_store() -> DataStore:
+    """PostgreSQL when DATABASE_URL is set (run migrations and `python -m app.seed` first);
+    otherwise the in-memory sample data, for local runs without a database."""
+    url = os.environ.get("DATABASE_URL")
+    if not url:
+        return seeded_store()
+    from .db import make_engine
+    from .sql_store import SqlStore
+
+    return SqlStore(make_engine(url))
+
+
+def create_app(store: DataStore | None = None, gateway: Gateway | None = None) -> FastAPI:
+    app = FastAPI(title="SecureFin API")
+    app.state.store = store or default_store()
+    app.state.gateway = gateway or build_gateway()
+    app.include_router(router)
+    app.include_router(internal_router)
+    return app
+
+
+app = create_app()

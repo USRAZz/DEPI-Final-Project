@@ -1,10 +1,11 @@
 """Output of the quarantined extractor (SDD §5.1). Text outside this schema is discarded."""
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
+from enum import Enum
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from .common import InvoiceStatus
+from .common import Contract, InvoiceStatus
 
 
 class LineItem(BaseModel):
@@ -41,3 +42,30 @@ class ExtractResponse(BaseModel):
     issue_codes: list[str] = Field(default_factory=list, max_length=20)
     ocr_confidence: float | None = Field(default=None, ge=0, le=1)
     category: str | None = Field(default=None, max_length=64)
+
+
+class InvoiceSource(str, Enum):
+    UPLOAD = "upload"
+    EMAIL = "email"
+    ETA = "eta"
+
+
+class Invoice(Contract):
+    """The stored record, written by services/api. `fields` is the extractor's validated output."""
+
+    id: int
+    company_id: int
+    vendor_id: int | None = None
+    source: InvoiceSource
+    status: InvoiceStatus
+    fields: InvoiceData | None = None
+    file_key: str = Field(max_length=500)
+    # sha256 of the file bytes (lowercase hex). The database refuses the same file twice per company.
+    file_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+    duplicate_of: int | None = None
+    category: str | None = Field(default=None, max_length=64)
+    uploaded_by: int | None = None
+    created_at: datetime
+    # From ExtractResponse; used to build RiskFeatures. Stable codes such as TOTAL_MISMATCH, never free text.
+    extraction_issues: list[str] = Field(default_factory=list, max_length=20)
+    ocr_confidence: float | None = Field(default=None, ge=0, le=1)

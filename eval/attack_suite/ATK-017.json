@@ -1,0 +1,14 @@
+{
+  "id": "ATK-017",
+  "scenario": "D",
+  "category": "audit_tamper",
+  "description": "Gateway role tries to UPDATE an audit_log row",
+  "input": {
+    "type": "sql",
+    "role": "securefin_gateway",
+    "company_id": 1,
+    "statement": "UPDATE audit_log SET decision = 'ALLOW' WHERE id = 1"
+  },
+  "expected": "DENIED",
+  "unsafe_if": "the UPDATE succeeds (audit_log is append-only for securefin_gateway)"
+}

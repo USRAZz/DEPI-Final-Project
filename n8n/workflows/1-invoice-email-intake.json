@@ -1,0 +1,547 @@
+{
+  "id": "sfInvoiceIntake001",
+  "name": "1 Invoice email intake",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "securefin-test-intake",
+        "formTitle": "Test 1: invoice intake",
+        "formDescription": "Upload any invoice file from the project (for example tests/fixtures/synthetic/clear_invoices_20/STRESS3-001.pdf). The workflow hashes it, names it by its SHA-256 and shows the message it would send. Nothing is stored or sent.",
+        "formFields": {
+          "values": [
+            {
+              "fieldName": "invoice_file",
+              "fieldLabel": "Invoice file (PDF or image)",
+              "fieldType": "file",
+              "requiredField": true,
+              "multipleFiles": false,
+              "acceptFileTypes": ".pdf, .png, .jpg, .jpeg, .webp, .tif, .tiff"
+            },
+            {
+              "fieldName": "sender_email",
+              "fieldLabel": "Sender email (any address)",
+              "fieldType": "email",
+              "requiredField": true,
+              "defaultValue": "supplier@example.com"
+            }
+          ]
+        },
+        "responseMode": "responseNode",
+        "options": {
+          "buttonLabel": "Run",
+          "customCss": "#submitted-content { white-space: pre-line; text-align: start; unicode-bidi: plaintext; }"
+        }
+      },
+      "id": "a0",
+      "name": "Test form",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        220
+      ],
+      "webhookId": "securefin-test-intake"
+    },
+    {
+      "parameters": {
+        "mailbox": "INBOX",
+        "postProcessAction": "read",
+        "downloadAttachments": true,
+        "dataPropertyAttachmentsPrefixName": "attachment_",
+        "options": {
+          "customEmailConfig": "[\"UNSEEN\"]"
+        }
+      },
+      "id": "a1",
+      "name": "New invoice email",
+      "type": "n8n-nodes-base.emailReadImap",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "credentials": {
+        "imap": {
+          "id": "sfInvoiceInbox0001",
+          "name": "Invoice inbox (IMAP)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// One item per invoice attachment. The type comes from the MIME type the mail client declared; the API\n// checks the real file bytes and enforces the size limit (413), so there is one limit, in one place.\nconst EXT = { 'application/pdf': 'pdf', 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp', 'image/tiff': 'tif' };\nconst MAX_PER_EMAIL = 5;\nconst out = [];\nfor (const item of $input.all()) {\n  const j = item.json;\n  const from = typeof j.from === 'string' ? j.from : (j.from?.value?.[0]?.address ?? j['Sender email (any address)'] ?? '');  // the second one: test form\n  const sender = (from.match(/[^\\s<>\"]+@[^\\s<>\"]+/) ?? [''])[0].toLowerCase();\n  // Message-ID is chosen by the sender, so it is only ever used hashed (see \"Idempotency key\").\n  const messageId = String(j.messageId ?? j.metadata?.['message-id'] ?? `uid-${j.attributes?.uid ?? ''}`);\n  let kept = 0;\n  for (const bin of Object.values(item.binary ?? {})) {\n    const ext = EXT[(bin.mimeType ?? '').toLowerCase()];\n    if (!ext || kept >= MAX_PER_EMAIL) continue;\n    kept += 1;\n    out.push({ json: { sender, message_id: messageId, ext }, binary: { file: bin } });\n  }\n}\nreturn out;"
+      },
+      "id": "a2",
+      "name": "Keep invoice attachments",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "action": "hash",
+        "type": "SHA256",
+        "binaryData": true,
+        "binaryPropertyName": "file",
+        "dataPropertyName": "sha256",
+        "encoding": "hex"
+      },
+      "id": "a3",
+      "name": "File SHA-256",
+      "type": "n8n-nodes-base.crypto",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "action": "hash",
+        "type": "SHA256",
+        "value": "={{ $json.message_id + ':' + $json.sha256 }}",
+        "dataPropertyName": "idempotency_key",
+        "encoding": "hex"
+      },
+      "id": "a4",
+      "name": "Idempotency key",
+      "type": "n8n-nodes-base.crypto",
+      "typeVersion": 2,
+      "position": [
+        660,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const env = (k) => { try { return String($env[k] ?? ''); } catch (e) { return ''; } };  // '' when unset or blocked\n// Arabic file names arrive garbled and are sender-controlled: the file is named after its own hash.\n// The hash nodes pass on JSON only, so the file is taken again from the node that split the attachments.\nconst source = $('Keep invoice attachments').all();\nconst api_connected = env('N8N_INVOICE_UPLOAD_URL') !== '';\nreturn $input.all().map((item, i) => ({\n  json: { ...item.json, api_connected },\n  binary: { file: { ...source[i].binary.file, fileName: `${item.json.sha256}.${item.json.ext}` } },\n  pairedItem: i,\n}));"
+      },
+      "id": "a5",
+      "name": "Name file by hash",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.N8N_INVOICE_UPLOAD_URL }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Service-Token",
+              "value": "={{ $env.N8N_INTAKE_TOKEN }}"
+            },
+            {
+              "name": "X-Company-Id",
+              "value": "={{ $env.N8N_COMPANY_ID }}"
+            },
+            {
+              "name": "Idempotency-Key",
+              "value": "={{ $json.idempotency_key }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "file",
+              "inputDataFieldName": "file"
+            },
+            {
+              "name": "source",
+              "value": "email"
+            },
+            {
+              "name": "sender",
+              "value": "={{ $json.sender }}"
+            },
+            {
+              "name": "sha256",
+              "value": "={{ $json.sha256 }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "a6",
+      "name": "Upload to API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1320,
+        0
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.api_connected }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "a9",
+      "name": "API connected?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "removeItemsSeenInPreviousExecutions",
+        "logic": "removeItemsWithAlreadySeenKeyValues",
+        "dedupeValue": "={{ $('Test form').isExecuted ? 'form-' + $execution.id : $json.sha256 }}",
+        "options": {
+          "scope": "node",
+          "historySize": 10000
+        }
+      },
+      "id": "a10",
+      "name": "Skip files already seen",
+      "type": "n8n-nodes-base.removeDuplicates",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Standalone mode (N8N_INVOICE_UPLOAD_URL is empty): the api is not connected yet, so the invoice is only\n// announced. Nothing is stored anywhere; the file stays in the mailbox.\nconst html = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\nreturn $input.all().map((item, i) => {\n  const j = item.json;\n  const plain = ['فاتورة جديدة وصلت بالبريد', 'New invoice received by email', '',\n    `From / من: ${String(j.sender || 'unknown').slice(0, 120)}`,\n    `File / الملف: ${j.sha256}.${j.ext}`, '',\n    'Standalone mode: not sent to the API yet / وضع مستقل: لم تُرسل إلى النظام بعد'].join('\\n');\n  return { json: { subject: 'SecureFin: new invoice received (standalone mode)', plain, text: html(plain) }, pairedItem: i };\n});"
+      },
+      "id": "a11",
+      "name": "Build received message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1540,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $('Test form').isExecuted }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "a14",
+      "name": "Started from test form?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1760,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { formSubmittedText: $json.plain } }}",
+        "options": {}
+      },
+      "id": "a15",
+      "name": "Show result on screen",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1980,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $env.TELEGRAM_CHAT_ID }}",
+        "text": "={{ $json.text }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML",
+          "disable_web_page_preview": true
+        }
+      },
+      "id": "a12",
+      "name": "Tell the team",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1980,
+        360
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "sfTelegramAlerts01",
+          "name": "SecureFin alerts bot (Telegram)"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 2000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{ $env.ALERT_EMAIL_FROM }}",
+        "toEmail": "={{ $env.ALERT_EMAIL_TO }}",
+        "subject": "={{ $('Build received message').item.json.subject }}",
+        "emailFormat": "text",
+        "text": "={{ $('Build received message').item.json.plain }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "a13",
+      "name": "Email fallback",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        2200,
+        460
+      ],
+      "credentials": {
+        "smtp": {
+          "id": "sfAlertsSmtp00001",
+          "name": "SecureFin alerts (SMTP)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// 409 = the API already has this file (UNIQUE source_hash): a duplicate, not a failure.\nconst failed = [];\nfor (const item of $input.all()) {\n  const e = item.json.error ?? {};\n  const status = Number(e.httpCode ?? e.status ?? e.cause?.status ?? e.context?.data?.status ?? 0);\n  const text = String(e.message ?? e.description ?? item.json.error ?? 'no response');\n  if (status === 409 || /\\b409\\b/.test(text)) continue;\n  failed.push(`${item.json.sha256 ?? 'unknown file'}: ${text.slice(0, 160)}`);\n}\nif (!failed.length) return [];\nreturn [{ json: { message: `Invoice intake: ${failed.length} file(s) not uploaded after 3 tries. ` + failed.join(' | ') } }];"
+      },
+      "id": "a7",
+      "name": "Real failures only",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "errorMessage": "={{ $json.message }}"
+      },
+      "id": "a8",
+      "name": "Fail the run",
+      "type": "n8n-nodes-base.stopAndError",
+      "typeVersion": 1,
+      "position": [
+        1540,
+        120
+      ]
+    }
+  ],
+  "connections": {
+    "New invoice email": {
+      "main": [
+        [
+          {
+            "node": "Keep invoice attachments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Keep invoice attachments": {
+      "main": [
+        [
+          {
+            "node": "File SHA-256",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "File SHA-256": {
+      "main": [
+        [
+          {
+            "node": "Idempotency key",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Idempotency key": {
+      "main": [
+        [
+          {
+            "node": "Name file by hash",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Name file by hash": {
+      "main": [
+        [
+          {
+            "node": "API connected?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "API connected?": {
+      "main": [
+        [
+          {
+            "node": "Upload to API",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Skip files already seen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Skip files already seen": {
+      "main": [
+        [
+          {
+            "node": "Build received message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build received message": {
+      "main": [
+        [
+          {
+            "node": "Started from test form?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Started from test form?": {
+      "main": [
+        [
+          {
+            "node": "Show result on screen",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Tell the team",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tell the team": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Email fallback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Test form": {
+      "main": [
+        [
+          {
+            "node": "Keep invoice attachments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload to API": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Real failures only",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Real failures only": {
+      "main": [
+        [
+          {
+            "node": "Fail the run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "errorWorkflow": "sfErrorAlerts0001"
+  },
+  "active": false
+}

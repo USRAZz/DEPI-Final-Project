@@ -139,3 +139,72 @@ python eval/ocr_benchmark.py --engine paddleocr --set all --paddle-item-crop-pas
 python eval/ocr_benchmark.py --engine tesseract --set all --preprocess enhance --output eval/results/ocr_tesseract_all_enhanced.csv
 python eval/ocr_benchmark.py --engine tesseract --set all --tesseract-psm 11 --output eval/results/ocr_tesseract_all_psm11.csv
 ```
+
+### Service OCR check (2026-11-10)
+
+`eval/service_ocr_check.py` scores what `services/extractor/app/ocr.py` actually runs, with the same normalized scoring, on all 130 invoices.
+
+| Service configuration | Field hits | Vendor | Descriptions | Quantity | Mean time/page |
+|---|---:|---:|---:|---:|---:|
+| Before: 200 dpi render, full-page ar + en | 1,962/2,032 (96.6%) | 124/130 | 171/228 | 225/228 | 11.24 s |
+| After: embedded scan at native size + Arabic header pass | **1,964/2,032 (96.7%)** | **126/130** | 168/228 | **228/228** | **8.79 s** |
+
+Per invoice: vendor fixed on INV-003/013/042, STRESS-016/025, STRESS3-012; vendor lost on INV-008, STRESS-022, STRESS3-007, STRESS3-013; three descriptions and one tax value lost. Net +2 fields and 22% faster.
+
+**Review of every remaining miss (2026-11-10).** The raw OCR text of the 29 invoices with misses was compared with the expected values (`--invoice-id ... --save-text DIR`). Causes:
+
+1. *Header merge, 4 vendors.* The full page and the 2x header crop split text differently: one box `شركة المرسى للخدمات` against three word boxes. The old merge compared single words, so one surer word replaced the whole phrase (word order broke on STRESS3-007/013) or crop words were added twice (`مكتبة مكتبة ال الصفوة` on INV-008). On STRESS-022 the crop dropped a letter (`السنبة`) but scored 0.03 higher and won.
+2. *Letters inside amounts, 1 tax.* `1,521.B0` on STRESS-003.
+3. *Arabic item descriptions in degraded table cells, 60 fields.* The recognizer drops dots and thin strokes (`خمة` for `خدمة`, `اسشاربة` for `استشارية`); on the two bilingual STRESS-030 / STRESS2-030 pages whole cells are lost. Re-reading the whole page enhanced and enlarged 2x did not help (3/19 descriptions before and after on six such invoices) and took 3x longer, so this is a recognition limit on these images, not a merge problem. The downstream LLM extraction sees the misspelled text; it is not fixed in OCR.
+
+Fixes in `ocr.py`: overlapping boxes from the two passes are compared as one group, read right to left. The crop group replaces the full-page group only when the full page mixed a Latin letter into Arabic or the crop's mean score is higher by `HEADER_MARGIN` = 0.05. Differing Latin readings (ids, IBANs) are both kept. Amount-shaped tokens with at least three digits get `B O o S l I` read as digits. The margin was tuned on cached raw output of all 130 invoices (0.03 and 0.05 tie; 0.0, 0.02 and 0.1 lose one vendor each).
+
+| Service configuration (fresh run on all 130) | Field hits | Vendor | Account | Tax | Descriptions | Mean time/page |
+|---|---:|---:|---:|---:|---:|---:|
+| Before (200 dpi, full page ar + en) | 1,962/2,032 (96.6%) | 124/130 | 130/130 | 129/130 | 171/228 | 11.24 s |
+| Header pass, word-level merge | 1,964/2,032 (96.7%) | 126/130 | 130/130 | 129/130 | 168/228 | 8.79 s |
+| Header pass, group merge + amount fix | **1,969/2,032 (96.9%)** | **130/130** | **130/130** | **130/130** | 168/228 | 9.24 s |
+
+Every field outside the item table now matches on all 130 invoices. The 63 remaining misses are 60 Arabic descriptions and 3 line totals, all in the item table of STRESS-tier pages (STRESS-004 line 2 is a label mismatch, see above).
+
+**Experiments on the 60 remaining Arabic descriptions (2026-11-10), none adopted.** The pages that miss are small scans (median 793x1122 px, about 96 dpi; Arabic table lines 10-23 px tall vs 35 px on the clean INV pages), so the strokes are not in the image.
+
+| Experiment (26 invoices with description misses) | Arabic descriptions / other effect | Time |
+|---|---|---|
+| Recognizer-only re-read of each table line crop: plain, 2x, 2x/3x stroke thickening, Otsu, median+sharpen, gamma darken | best 7/68 vs 8/68 baseline | ~3 s/26 pages |
+| Embedded scan (current) vs PDF render at 200 / 300 dpi | descriptions 11 / 14 / 20 of 71, but total 455 / 453 / 453 of 518 (vendors and amounts lost) | 7.1 / 9.9 / 17.7 s/page |
+| Local vision LLM via Ollama: gemma4:e4b, qwen3.8 | gemma: "no Arabic text"; qwen3.8 read `خدمة صيانة` as `خدمة عمولة` (invented a plausible word) | 52 s/line |
+
+Only `arabic_PP-OCRv5_mobile_rec` exists for Arabic in PaddleOCR (no server model). Candidates not tried (need multi-GB downloads): QARI-OCR (Qwen2-VL-2B fine-tuned on degraded Arabic) and PaddleOCR-VL. A VLM that guesses words is risky for amounts and names; if tried, use it only for descriptions and keep the PaddleOCR reading next to it.
+
+**QARI-OCR second reading (2026-11-12, opt-in `OCR_ARABIC_REREAD=qari`).** [QARI-OCR v0.3](https://huggingface.co/NAMAA-Space/Qari-OCR-v0.3-VL-2B-Instruct) is Qwen2-VL-2B fine-tuned on degraded Arabic print. Run on an RTX 5070 Ti (fp16).
+
+| QARI setup (26 pages with description misses) | All fields | Arabic descriptions | Notes |
+|---|---:|---:|---|
+| PaddleOCR only | 455/518 | 11/71 | |
+| QARI per table line, replacing Paddle | 39/46 on 2 pages, no gain | 0/7 | single lines are out of its training: HTML tags, Chinese, prompt echoed |
+| QARI on the whole table region, 300 dpi render | 54/63 on 3 pages, no gain | 0/9 | skipped the description column |
+| QARI on the whole table region, embedded scan, text **added** after Paddle's | 475/518 | 30/71 | +1 amount came from QARI |
+| Same, QARI amount tokens dropped (adopted) | 474/518 | 30/71 | all gains are descriptions |
+
+QARI alone is worse than PaddleOCR (254/518) and invents plausible words (`خدمة مالية` for `خدمة معايرة`, `اللبنان` for `البيان`), so it never replaces PaddleOCR. The service adds its reading after a marker line (`REREAD_MARKER`), with amounts removed, so every number still comes from PaddleOCR. It runs only when the weakest Arabic line below the header scored under `REREAD_SCORE` = 0.8 (catches 21 of the 26 bad pages; mean score would catch 11).
+
+| All 130 invoices (cached PaddleOCR output, identical to the fresh service run, + the real `needs_reread` / `qari_table_lines`) | Field hits | Descriptions | QARI pages | Extra time |
+|---|---:|---:|---:|---:|
+| PaddleOCR (default) | 1,969/2,032 (96.9%) | 168/228 | 0 | 0 |
+| + QARI second reading | **1,985/2,032 (97.7%)** | **184/228** | 41/130 | 10.9 s per re-read page (~3.4 s/page on average) |
+
+No non-description field changed. Off by default because it adds torch + transformers and a 4.5 GB model to the extractor, needs a GPU to be practical, and the downstream LLM extraction has not yet been measured on text that contains a second, possibly wrong, reading. Precision of the extracted fields must be checked before turning it on.
+
+**Does the QARI reading help the LLM extraction? (2026-11-13).** The real `pipeline.process_invoice` (masking, extractor prompt, checks) was run on the 41 pages where QARI runs, once with the PaddleOCR text and once with the QARI block added. The extractor LLM was a local `qwen3:8b` through Ollama's OpenAI-compatible endpoint (the project `.env` has no OpenAI key or model yet), so absolute numbers are not the production model's. Gate threshold 0.85 was also tried: 1,986 vs 1,985 field hits but QARI on 54 pages instead of 41, so `REREAD_SCORE` stays 0.8.
+
+| Extracted field (41 pages) | PaddleOCR text | + QARI block |
+|---|---:|---:|
+| Line descriptions | 59/106 | **71/106** |
+| Date / invoice number | 40/41, 40/41 | 41/41, 41/41 |
+| Line totals / total / tax | 104/106, 41/41, 37/41 | 104/106, 41/41, 37/41 |
+| Subtotal | 41/41 | 40/41 |
+| Vendor | 28/41 | 25/41 |
+| All | 390/458 | **400/458** |
+
+Descriptions gain clearly. The vendor changes go both ways (4 won, 7 lost) although the QARI block covers only the table and holds no vendor text, and the same invoice gave different losses on two runs (STRESS-004: tax in one, vendor and subtotal in the other), so these look like run-to-run variation of the local model, not QARI misleading it. Before turning `OCR_ARABIC_REREAD=qari` on, repeat this with the production extractor model and run each variant at least twice to measure that variation. Scripts: `extract_eval.py`, `cache_qari.py`, `full_check.py` (kept outside the repo).

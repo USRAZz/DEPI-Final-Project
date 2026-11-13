@@ -1,7 +1,10 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import ar from "./locales/ar.json";
+import en from "./locales/en.json";
 import type { Lang } from "./types";
 
 type Messages = Record<string, string>;
+type Vars = Record<string, string | number | undefined>;
 type Ctx = { lang: Lang; setLang: (l: Lang) => void };
 
 const LanguageContext = createContext<Ctx>({ lang: "ar", setLang: () => {} });
@@ -45,11 +48,29 @@ export function useLanguage() {
 /**
  * Each feature passes its own message files, so translations never collide:
  *   const t = useT({ ar, en });  t("title")
+ * Optional vars fill {{placeholders}}: t("hello", { name }). A numeric `count` picks
+ * key_one / key_other when those exist, and `defaultValue` replaces a missing key.
  * A missing key falls back to English, then to the key itself.
  */
 export function useT(messages: Record<Lang, Messages>) {
   const { lang } = useLanguage();
-  return useCallback((key: string) => messages[lang][key] ?? messages.en[key] ?? key, [lang, messages]);
+  return useCallback(
+    (key: string, vars?: Vars) => {
+      const count = vars?.count;
+      const keys = typeof count === "number" ? [`${key}_${new Intl.PluralRules(lang).select(count)}`, `${key}_other`, key] : [key];
+      const find = (table: Messages) => keys.map((k) => table[k]).find((text) => text !== undefined);
+      const text = find(messages[lang]) ?? find(messages.en) ?? vars?.defaultValue ?? key;
+      return String(text).replace(/\{\{(\w+)\}\}/g, (match, name: string) => String(vars?.[name] ?? match));
+    },
+    [lang, messages],
+  );
+}
+
+const shell = { ar, en };
+
+/** Terms shared across the app: roles, banks, risk levels, loading and error text. */
+export function useShellT() {
+  return useT(shell);
 }
 
 const LOCALE: Record<Lang, string> = { ar: "ar-EG", en: "en-EG" };

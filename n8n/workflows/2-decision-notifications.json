@@ -1,0 +1,494 @@
+{
+  "id": "sfDecisionNotify01",
+  "name": "2 Decision notifications",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "securefin-test-notify",
+        "formTitle": "Test 2: decision notification",
+        "formDescription": "Pick a decision the gateway could make. The workflow builds the Arabic + English message an approver would get and shows it here. Nothing is sent.",
+        "formFields": {
+          "values": [
+            {
+              "fieldName": "event_type",
+              "fieldLabel": "Decision",
+              "fieldType": "dropdown",
+              "requiredField": true,
+              "defaultValue": "hold = payment on hold",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "hold = payment on hold"
+                  },
+                  {
+                    "option": "block = payment blocked"
+                  },
+                  {
+                    "option": "needs_second_approval = second approver needed"
+                  },
+                  {
+                    "option": "bank_change_pending = vendor bank details changed"
+                  }
+                ]
+              }
+            },
+            {
+              "fieldName": "id",
+              "fieldLabel": "Payment request number (or vendor number for a bank change)",
+              "fieldType": "number",
+              "requiredField": true,
+              "defaultValue": "123"
+            },
+            {
+              "fieldName": "reasons",
+              "fieldLabel": "Reasons, separated by commas",
+              "fieldType": "text",
+              "requiredField": true,
+              "defaultValue": "VENDOR_ACCOUNT_MISMATCH, DUPLICATE_INVOICE"
+            }
+          ]
+        },
+        "responseMode": "responseNode",
+        "options": {
+          "buttonLabel": "Run",
+          "customCss": "#submitted-content { white-space: pre-line; text-align: start; unicode-bidi: plaintext; }"
+        }
+      },
+      "id": "b12",
+      "name": "Test form",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.1,
+      "position": [
+        1100,
+        -300
+      ],
+      "webhookId": "securefin-test-notify"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Test form -> the same event shape the gateway will send. The form path only shows the message on\n// screen; it never sends it, so it is not a way around the signature check.\nconst f = $input.first().json;\nconst type = String(f['Decision']).split(' ')[0];\nconst id = Math.max(1, Math.floor(Number(f['Payment request number (or vendor number for a bank change)']) || 1));\nconst vendor = type === 'bank_change_pending';\nconst reasons = String(f['Reasons, separated by commas'] ?? '').split(',').map((s) => s.trim()).filter(Boolean);\nreturn [{ json: { valid: true, event: {\n  event_id: `form-${$execution.id}`, event_type: type, company_id: 1,\n  payment_request_id: vendor ? null : id, vendor_id: vendor ? id : null, reasons, expires_at: null,\n} } }];"
+      },
+      "id": "b13",
+      "name": "Form to event",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        -300
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "securefin/decision-events",
+        "responseMode": "responseNode",
+        "options": {
+          "rawBody": true
+        }
+      },
+      "id": "b1",
+      "name": "Gateway event",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "sf-decision-events"
+    },
+    {
+      "parameters": {
+        "jsCode": "const env = (k) => { try { return String($env[k] ?? ''); } catch (e) { return ''; } };  // '' when unset or blocked\n// Signed text = \"<timestamp>.<raw body>\", so an old request cannot be replayed with a fresh timestamp.\nconst item = $input.first();\nconst headers = item.json.headers ?? {};\nconst raw = (await this.helpers.getBinaryDataBuffer(0, 'data')).toString('utf8');\nconst ts = String(headers['x-securefin-timestamp'] ?? '');\nconst age = Math.abs(Date.now() / 1000 - Number(ts));\nreturn [{ json: {\n  raw,\n  signed: `${ts}.${raw}`,\n  signature: String(headers['x-securefin-signature'] ?? ''),\n  fresh: /^\\d{10}$/.test(ts) && age <= 300,\n  secret_set: env('N8N_WEBHOOK_HMAC_SECRET').length >= 32,\n} }];"
+      },
+      "id": "b2",
+      "name": "Read signed body",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "action": "hmac",
+        "type": "SHA256",
+        "value": "={{ $json.signed }}",
+        "dataPropertyName": "expected",
+        "secret": "={{ $env.N8N_WEBHOOK_HMAC_SECRET }}",
+        "encoding": "hex"
+      },
+      "id": "b3",
+      "name": "Expected HMAC",
+      "type": "n8n-nodes-base.crypto",
+      "typeVersion": 1,
+      "position": [
+        440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Fails closed: no secret, stale timestamp, bad signature or an unexpected payload all give valid=false.\nconst j = $input.first().json;\nconst want = `sha256=${j.expected}`;\nlet diff = want.length ^ j.signature.length;\nfor (let i = 0; i < want.length; i++) diff |= want.charCodeAt(i) ^ (j.signature.charCodeAt(i) || 0);\nlet event = null;\ntry { event = JSON.parse(j.raw); } catch (e) { event = null; }\nconst TYPES = ['hold', 'block', 'needs_second_approval', 'bank_change_pending'];\nconst id = (v) => Number.isInteger(v) && v > 0;\nconst shaped = !!event && TYPES.includes(event.event_type)\n  && typeof event.event_id === 'string' && /^[A-Za-z0-9_.:-]{8,100}$/.test(event.event_id)\n  && (event.event_type === 'bank_change_pending' ? id(event.vendor_id) : id(event.payment_request_id));\nconst valid = j.secret_set && j.fresh && diff === 0 && shaped;\nreturn [{ json: valid ? { valid, event } : { valid } }];"
+      },
+      "id": "b4",
+      "name": "Verify event",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "b5",
+      "name": "Signed and fresh?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        880,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { accepted: true } }}",
+        "options": {
+          "responseCode": 202
+        }
+      },
+      "id": "b6",
+      "name": "Accept",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1100,
+        -80
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { accepted: false } }}",
+        "options": {
+          "responseCode": 401
+        }
+      },
+      "id": "b7",
+      "name": "Reject",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1100,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "removeItemsSeenInPreviousExecutions",
+        "logic": "removeItemsWithAlreadySeenKeyValues",
+        "dedupeValue": "={{ $json.event.event_id }}",
+        "options": {
+          "scope": "node",
+          "historySize": 10000
+        }
+      },
+      "id": "b8",
+      "name": "Skip repeated event_id",
+      "type": "n8n-nodes-base.removeDuplicates",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        -80
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const env = (k) => { try { return String($env[k] ?? ''); } catch (e) { return ''; } };  // '' when unset or blocked\n// Only ids, the event type and reason codes leave the system: no amounts, vendor names or bank details.\n// The link is built here from APP_BASE_URL, never taken from the payload. There is no approve button:\n// approvals happen in the app, through the gateway.\nconst TEXT = {\n  hold: ['Payment on hold', 'دفعة موقوفة للمراجعة'],\n  block: ['Payment blocked', 'تم حظر الدفعة'],\n  needs_second_approval: ['Second approval needed', 'مطلوب موافقة ثانية'],\n  bank_change_pending: ['Vendor bank details changed: waiting period started', 'تغيير بيانات بنك المورد: بدأت فترة الانتظار'],\n};\nconst clean = (s) => String(s).replace(/[\\u0000-\\u001f]/g, ' ').slice(0, 120);\nconst html = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\nconst e = $input.first().json.event;\nconst base = (env('APP_BASE_URL') || 'http://localhost:3000').replace(/\\/+$/, '');\nconst vendor = e.event_type === 'bank_change_pending';\nconst link = vendor ? `${base}/vendors/${e.vendor_id}` : `${base}/payments/${e.payment_request_id}`;\nconst ref = vendor ? `Vendor #${e.vendor_id}` : `Payment request #${e.payment_request_id}`;\nconst reasons = (Array.isArray(e.reasons) ? e.reasons : []).slice(0, 3).map(clean);\nconst [en, ar] = TEXT[e.event_type];\nconst lines = [\n  `${ar}`, `${en}`, '', ref,\n  ...(reasons.length ? ['Top reasons / أهم الأسباب:', ...reasons.map((r, i) => `${i + 1}. ${r}`)] : []),\n  ...(e.expires_at ? [`Until / حتى: ${clean(e.expires_at)}`] : []),\n  '', `Open in SecureFin / افتح في التطبيق: ${link}`,\n];\nconst plain = lines.join('\\n');  // email text; Telegram gets the same lines HTML-escaped\nreturn [{ json: { event_id: e.event_id, subject: `SecureFin: ${en} (${ref})`, plain, text: html(plain) } }];"
+      },
+      "id": "b9",
+      "name": "Build message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1540,
+        -80
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $('Test form').isExecuted }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "b14",
+      "name": "Started from test form?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1760,
+        -80
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { formSubmittedText: $json.plain } }}",
+        "options": {}
+      },
+      "id": "b15",
+      "name": "Show result on screen",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1980,
+        -180
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $env.TELEGRAM_CHAT_ID }}",
+        "text": "={{ $json.text }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML",
+          "disable_web_page_preview": true
+        }
+      },
+      "id": "b10",
+      "name": "Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1980,
+        20
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "sfTelegramAlerts01",
+          "name": "SecureFin alerts bot (Telegram)"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 2000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{ $env.ALERT_EMAIL_FROM }}",
+        "toEmail": "={{ $env.ALERT_EMAIL_TO }}",
+        "subject": "={{ $('Build message').item.json.subject }}",
+        "emailFormat": "text",
+        "text": "={{ $('Build message').item.json.plain }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "b11",
+      "name": "Email fallback",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        2200,
+        120
+      ],
+      "credentials": {
+        "smtp": {
+          "id": "sfAlertsSmtp00001",
+          "name": "SecureFin alerts (SMTP)"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Gateway event": {
+      "main": [
+        [
+          {
+            "node": "Read signed body",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read signed body": {
+      "main": [
+        [
+          {
+            "node": "Expected HMAC",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Expected HMAC": {
+      "main": [
+        [
+          {
+            "node": "Verify event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify event": {
+      "main": [
+        [
+          {
+            "node": "Signed and fresh?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Signed and fresh?": {
+      "main": [
+        [
+          {
+            "node": "Accept",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reject",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Accept": {
+      "main": [
+        [
+          {
+            "node": "Skip repeated event_id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Skip repeated event_id": {
+      "main": [
+        [
+          {
+            "node": "Build message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build message": {
+      "main": [
+        [
+          {
+            "node": "Started from test form?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Started from test form?": {
+      "main": [
+        [
+          {
+            "node": "Show result on screen",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Email fallback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Test form": {
+      "main": [
+        [
+          {
+            "node": "Form to event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Form to event": {
+      "main": [
+        [
+          {
+            "node": "Build message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "errorWorkflow": "sfErrorAlerts0001"
+  },
+  "active": false
+}

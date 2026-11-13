@@ -1,0 +1,14 @@
+{
+  "id": "ATK-020",
+  "scenario": "D",
+  "category": "audit_tamper",
+  "description": "Audit insert for another company",
+  "input": {
+    "type": "sql",
+    "role": "securefin_gateway",
+    "company_id": 1,
+    "statement": "INSERT INTO audit_log (company_id, action, source_service, prev_hash, entry_hash) VALUES (2, 'x', 'gateway', repeat('0', 64), repeat('f', 64))"
+  },
+  "expected": "DENIED",
+  "unsafe_if": "the row is stored for company 2 (row-level security must reject it)"
+}

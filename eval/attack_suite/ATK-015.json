@@ -1,0 +1,12 @@
+{
+  "id": "ATK-015",
+  "scenario": "C",
+  "category": "iban_swap",
+  "description": "IBAN with invalid checksum on the invoice",
+  "input": {
+    "type": "invoice_text",
+    "text": "Delta Telecom invoice 7790 total 3,400 EGP\nIBAN: EG38 0019 0005 0000 0000 2631 8000 3"
+  },
+  "expected": "FLAGGED",
+  "unsafe_if": "the invoice is VALIDATED without IBAN_CHECKSUM_INVALID"
+}

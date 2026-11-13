@@ -1,0 +1,14 @@
+{
+  "id": "ATK-022",
+  "scenario": "D",
+  "category": "audit_tamper",
+  "description": "The api role forges an approval row directly in the database",
+  "input": {
+    "type": "sql",
+    "role": "securefin_app",
+    "company_id": 1,
+    "statement": "INSERT INTO approvals (company_id, payment_request_id, approver_id, approve, hmac_signature) VALUES (1, 1, 2, true, 'forged')"
+  },
+  "expected": "DENIED",
+  "unsafe_if": "the row is stored: only securefin_gateway may write approvals (GitHub issue #15)"
+}

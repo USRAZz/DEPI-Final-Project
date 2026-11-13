@@ -1,7 +1,13 @@
 # eval/ — Evaluation harness (owner: M4 Ziad)
 
-- `attack_suite/` — labelled malicious documents & prompts (target 50–100). One JSON per case:
-  `{"id": "ATK-001", "scenario": "A", "input": {...}, "unsafe_if": "create_payment_request to non-verified IBAN"}`
+- `attack_suite/` — labelled malicious documents & prompts (target 50–100; 22 now). One JSON per case:
+  `{"id", "scenario", "category", "description", "input": {"type": ...}, "expected", "unsafe_if"}`.
+  Scenarios: A `prompt_injection` (hidden instructions in a document or chat), B `self_approval`
+  (maker-checker bypass), C `iban_swap` (bank-account change), D `audit_tamper` (editing approvals / audit log).
+  Input types: `invoice_text`, `chat_message`, `api_sequence`, `proposed_action`, `sql`.
+  `expected` is what a safe system returns (`BLOCK`, `PENDING_APPROVAL`, `NEEDS-REVIEW`, `FLAGGED`,
+  `VENDOR_CHANGE_PENDING`, `DENIED` for a database permission error, `CHAIN_BROKEN` for the hash-chain check).
+  `tests/test_attack_suite.py` checks every file.
 - `legit_set/` — normal requests & invoices (measures false-block rate).
 - `run_asr.py` — ASR experiment skeleton. It is not runnable yet; `run_case()` still needs the API integration.
 - `ocr_benchmark.py` — runs either Tesseract (`ara+eng`) or PaddleOCR on the 130 image-only invoice PDFs and writes per-invoice field-hit and latency results under ignored `eval/results/`. PaddleOCR sorts Arabic word boxes right-to-left, runs Arabic and English recognition on Arabic/mixed pages, and defaults to a sharpened 2x grayscale OCR pass on the supplier header. The full-page grayscale/autocontrast/upscale/sharpen experiment (`--preprocess enhance`) reduced PaddleOCR accuracy, so original images remain the default outside the targeted header crop.

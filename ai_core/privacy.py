@@ -11,6 +11,8 @@ _DIGITS = str.maketrans("٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹", "01234567890
 # IBAN: 2 letters + 2 check digits, then either 10-30 alphanumerics written together, or groups of 4
 # separated by single spaces (the printed form) with a shorter last group.
 _IBAN = re.compile(r"\b[A-Z]{2}\d{2}(?:[A-Z0-9]{10,30}|(?: [A-Z0-9]{4}){2,7}(?: [A-Z0-9]{1,4})?)\b")
+# Words that label an IBAN on an invoice (English / Arabic).
+_IBAN_LABEL = re.compile(r"(?i)iban|[اأآإ]يبان|رقم الحساب")
 # Egyptian tax registration number: 9 digits (often 3-3-3), only when a tax label is close before it.
 _TAX = re.compile(r"(?i)(tax|t\.?r\.?n|vat|ضريب|التسجيل الضريبي|رقم التسجيل)[^\d\n]{0,30}(\d{3}[-\s]?\d{3}[-\s]?\d{3})\b")
 _EMAIL = re.compile(r"\b[\w.+-]+@[\w-]+\.[\w.-]+\b")
@@ -30,18 +32,27 @@ def _iban_valid(candidate: str) -> bool:
 
 
 def find_ibans(text: str) -> list[str]:
-    """IBANs with a valid checksum, spaces removed, in reading order."""
-    out = []
-    for m in _IBAN.finditer(normalize_digits(text).upper()):
+    """IBANs, spaces removed, in reading order: valid checksums first, then invalid ones.
+
+    An IBAN whose checksum fails is kept only when an IBAN label is just before it, so the pipeline can
+    flag it (IBAN_CHECKSUM_INVALID) instead of dropping it; other IBAN-shaped codes (order refs) are ignored.
+    Only trailing groups with a letter are dropped (a following word taken as a group). Digit groups are
+    never dropped: a shorter number passes the mod-97 check by chance about 1 time in 97.
+    """
+    s = normalize_digits(text).upper()
+    valid, invalid = [], []
+    for m in _IBAN.finditer(s):
         groups = m.group(0).split(" ")
-        while groups:  # a following word may have been taken as a last group: drop groups until valid
-            iban = "".join(groups)
-            if len(iban) >= 15 and _iban_valid(iban):
-                if iban not in out:
-                    out.append(iban)
-                break
+        while len(groups) > 1 and not _iban_valid("".join(groups)) and re.search(r"[A-Z]", groups[-1]):
             groups.pop()
-    return out
+        iban = "".join(groups)
+        if len(iban) < 15:
+            continue
+        if _iban_valid(iban):
+            valid.append(iban)
+        elif _IBAN_LABEL.search(s[max(0, m.start() - 40):m.start()]):
+            invalid.append(iban)
+    return list(dict.fromkeys(valid + invalid))
 
 
 def find_tax_ids(text: str) -> list[str]:
