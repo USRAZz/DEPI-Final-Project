@@ -208,3 +208,16 @@ No non-description field changed. Off by default because it adds torch + transfo
 | All | 390/458 | **400/458** |
 
 Descriptions gain clearly. The vendor changes go both ways (4 won, 7 lost) although the QARI block covers only the table and holds no vendor text, and the same invoice gave different losses on two runs (STRESS-004: tax in one, vendor and subtotal in the other), so these look like run-to-run variation of the local model, not QARI misleading it. Before turning `OCR_ARABIC_REREAD=qari` on, repeat this with the production extractor model and run each variant at least twice to measure that variation. Scripts: `extract_eval.py`, `cache_qari.py`, `full_check.py` (kept outside the repo).
+
+**Vendor name: extractor prompt v2 (2026-11-13).** The vendor errors on those 41 pages were checked by running each page twice with the PaddleOCR text only (`vendor_dump.py`). With prompt v1, 29 pages were right both times and 8 were wrong both times. Most of the repeat errors are the page banner `SECUREFIN | TEST INVOICE` taken as the seller (8 pages). The others are an OCR-typo'd English name chosen over the correct Arabic one (`Oasi Transpr`), and two names joined into one. `prompts/extractor_v2.md` differs from v1 only in the `vendor_name` rule: ignore banners, watermarks and platform names, return one name, and return the Arabic name as written when both are printed. The rule does not name `SECUREFIN`, so that it is not fitted to this test set. It is selected with `PROMPT_VERSION_EXTRACTOR=v2`; the default is still v1.
+
+| 41 pages, `qwen3:8b` | v1 | v2 |
+|---|---:|---:|
+| Vendor right in both of 2 runs / wrong in both | 29 / 8 | **35 / 3** |
+| All extracted fields, PaddleOCR text | 390/458 | **400/458** |
+| All extracted fields, + QARI block | 400/458 | **409/458** |
+| Vendor (PaddleOCR / + QARI) | 28 / 25 | **37 / 35** |
+| Line descriptions (PaddleOCR / + QARI) | 59 / 71 | 60 / 72 |
+| Subtotal (PaddleOCR / + QARI) | 41 / 40 | 39 / 39 |
+
+The other fields move by one or two hits, which is the same size as the run-to-run variation seen above. Two pages still take the banner in both runs (STRESS2-003, -012). On STRESS2-027 v2 now copies an OCR typo exactly (`بدابة`), the cost of "as written". The same eval found that `pipeline.process_invoice` does not catch `RuntimeError("empty reply ...")` from `ai_core/llm.py` (the model ran out of tokens), so that error escapes the pipeline instead of returning `FAILED`. The eval scripts now score such a run as all fields wrong.
