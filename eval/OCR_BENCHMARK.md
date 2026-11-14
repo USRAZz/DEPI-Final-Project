@@ -262,3 +262,17 @@ Why Qwen3-VL gives fewer extracted descriptions: it is not the line order. Qwen3
 | All fields | 132 | 127 | **142** |
 
 v2's description loss is real: it copies OCR typos into item names. v3 removes it and keeps v2's vendor gain (the banner remains on STRESS2-003 in every version). One full v2-vs-v3 run on the 41 pages gave 386 vs 391, with one FAILED page each. **v3 is the default**; `PROMPT_VERSION_EXTRACTOR=v1` or `v2` pins an older one.
+
+**All 130 invoices and prompt v4 (2026-11-15).** The three prompts ran on the PaddleOCR text of all 130 invoices with a second local model, `gemma4:12b` (thinking turned off, see below). A first run of v1 against v3 showed a new loss: on pages whose item lines are printed in two languages, v3 returned both joined (`Network equipment / اامحدات شكات`) and the description no longer matched. v4 is v3 plus one sentence on `line_items`: "If a line's description is printed in two languages, return it in ONE language only, never both joined with "/"."
+
+| 130 invoices, `gemma4:12b` | v1 | v3 | v4 |
+|---|---|---|---|
+| Vendor (of 130) | 106 | 121 | 122 |
+| Line descriptions (of 228) | 165 | 139 | **177** |
+| Tax amount (of 130) | 128 | 128 | 129 |
+| All fields (of 1236) | 1146 | 1135 | **1175** |
+| FAILED pages | 0 | 0 | 0 |
+
+Invoice number, date, subtotal and total are 130/130 in every version; line totals are 227/228. v4 loses no field against v3 (it wins 38 descriptions, 1 vendor, 1 tax amount). Against v1 it wins 19 vendors and 13 descriptions and loses 3 vendors (INV-048, STRESS2-027, STRESS3-012: the Arabic name has an OCR typo and v1 took the clean English one) and 1 description. STRESS2-003 now returns the seller, not the "SECUREFIN" banner. **v4 is the default**; `PROMPT_VERSION_EXTRACTOR=v1`, `v2` or `v3` pins an older one. A clause "return the English name when the Arabic one is damaged" was tried and changed nothing, so it is not in v4.
+
+Two things found on the way. (1) `gemma4:12b` thinks by default; on some pages the thinking filled Ollama's context window, the reply came back empty (`finish_reason: length` after about 2,500 tokens, far below `max_tokens`) and the invoice was FAILED. Raising `LLM_MAX_TOKENS` does not help. With `reasoning_effort: none` the same pages pass 6 of 6 and a call takes about 7 s, down from 22 s. The eval harness sets this for gemma; a deployment on a local thinking model must turn thinking off too. (2) `LLM.structured()` now asks once more when the reply is empty, because local JSON mode also returns an empty reply at random. These numbers are from local models; the production model has not been measured yet.
