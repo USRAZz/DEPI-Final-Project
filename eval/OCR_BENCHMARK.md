@@ -233,3 +233,15 @@ The other fields move by one or two hits, which is the same size as the run-to-r
 | + **Qwen3-VL-4B base, no adapter**, bf16 | **481/518** | **37/71** | 10.4 s |
 
 The 0.4.0 adapter was trained on book pages and loops on item tables, so it is not usable here. Its base model reads the whole table, with small letter errors (`نصوير` for `تصوير`), and finds 7 more descriptions than v0.3 at the same speed. No non-description field changed. Qwen3 models need bf16; fp16 overflows. Not adopted yet. Before switching, the LLM extraction step must be measured on its text (precision and invented words, as for v0.3), and it needs about 9 GB of GPU memory against 4.5 GB, plus a different model class (`Qwen3VLForConditionalGeneration`).
+
+**Qwen3-VL-4B base at the LLM step (2026-11-14).** The base model's reading of the 41 gated pages was cached and run through `extract_eval.py` with prompt v2, the same as the QARI v0.3 run above.
+
+| 41 pages, `qwen3:8b`, prompt v2 | PaddleOCR text (same run) | + second reading |
+|---|---:|---:|
+| QARI v0.3: all fields | 400/458 | 409/458 |
+| QARI v0.3: line descriptions | 60/106 | 72/106 |
+| Qwen3-VL-4B base: all fields | 397/458 | 410/458 |
+| Qwen3-VL-4B base: line descriptions | 60/106 | 68/106 |
+| OCR text only (description found in the text) | 53/106 | v0.3 69, Qwen3-VL 76 |
+
+Qwen3-VL puts more correct descriptions into the text (76 vs 69), but the extracted fields end up level with v0.3 (410 vs 409, within run-to-run variation of 3 to 10 hits). It has fewer extracted descriptions (68 vs 72) and more tax/subtotal/total hits, and those totals come from PaddleOCR either way. **Decision: keep QARI v0.3.** Switching would double the GPU memory (about 9 GB against 4.5 GB) and need a new model class, for no measured gain at the step that matters.
