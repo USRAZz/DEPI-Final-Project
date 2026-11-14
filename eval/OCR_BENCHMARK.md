@@ -249,3 +249,16 @@ Qwen3-VL puts more correct descriptions into the text (76 vs 69), but the extrac
 Why Qwen3-VL gives fewer extracted descriptions: it is not the line order. Qwen3-VL returns neat, well-ordered table lines, but it rewrites words into plausible synonyms: `خدمة تسليم` for `خدمة توصيل`, `تدريب تقني` for `تدريب فني`, `اشتراك برامج` for `اشتراك برمجي`, `مواد تغليف` for `مستلزمات تغليف`. It also adds chat text ("Here is the OCR text...", "Note: the OCR has been cleaned up..."). The LLM then picks the fluent synonym over PaddleOCR's correct word. On STRESS2-030 it lost 4 descriptions that it had extracted correctly from the PaddleOCR text alone. QARI v0.3's mistakes are obvious garbage (Chinese characters, `لوصول`), and the LLM ignores them. A second reading that is wrong but plausible does more harm than one that is wrong and obviously broken.
 
 **v1 against v2, field by field (2026-11-14).** `field_dump.py` ran both prompts on the same PaddleOCR text of the 41 pages and kept every extracted field. All fields: v1 396/458, v2 404/458. **Subtotal: v1 40/41, v2 41/41.** The subtotal drop seen in the two earlier v2 runs does not repeat, so it was run-to-run variation (here v1 read 69365 for 9365 on STRESS-004). v2 won vendor on 13 pages and lost it on 3 (STRESS2-012 and STRESS2-015 took the banner; STRESS2-027 copied the OCR typo). One side effect of v2: on STRESS-030 it copied the OCR typos in the English item names (`Prnter toner`, `Maintenance senvice`), where v1 had corrected them, and lost 4 descriptions. The vendor rule's "exactly as written" seems to spread to other fields. The net result is still positive (descriptions: v2 lost 7 and won 2).
+
+**Prompt v3 (2026-11-14).** v3 keeps v2's vendor rule but drops "exactly as written" and adds "This rule is only about vendor_name: for every other field keep reading OCR mistakes from context". The four pages where v2 lost descriptions were each run 3 times with v1, v2 and v3 (`field_dump.py`, 12 runs per version):
+
+| Description hits per run | v1 | v2 | v3 |
+|---|---|---|---|
+| STRESS-030 (5 lines) | 5 5 5 | 4 0 3 | 5 5 5 |
+| STRESS-009 (1 line) | 1 1 1 | 1 0 0 | 1 1 1 |
+| STRESS-012 (3 lines) | 3 3 3 | 3 3 3 | 3 3 3 |
+| STRESS2-003 (4 lines) | 0 0 0 | 2 0 0 | 0 4 3 |
+| Vendor right (of 12) | 6 | 9 | 9 |
+| All fields | 132 | 127 | **142** |
+
+v2's description loss is real: it copies OCR typos into item names. v3 removes it and keeps v2's vendor gain (the banner remains on STRESS2-003 in every version). One full v2-vs-v3 run on the 41 pages gave 386 vs 391, with one FAILED page each. **v3 is the default**; `PROMPT_VERSION_EXTRACTOR=v1` or `v2` pins an older one.

@@ -197,11 +197,11 @@ class _Res:
         self.json = {"res": payload}
 
 
-def test_extractor_prompt_defaults_to_v2_and_can_be_pinned_back(monkeypatch):
+def test_extractor_prompt_defaults_to_v3_and_can_be_pinned_back(monkeypatch):
     from ai_core.prompts import load_prompt
     monkeypatch.delenv("PROMPT_VERSION_EXTRACTOR", raising=False)
     monkeypatch.delenv("PROMPT_VERSION", raising=False)
-    assert "banners" in load_prompt("extractor", json_schema="{}")
+    assert "only about vendor_name" in load_prompt("extractor", json_schema="{}")
     load_prompt("categorize", categories="a", json_schema="{}")  # other prompts still default to v1
     monkeypatch.setenv("PROMPT_VERSION_EXTRACTOR", "v1")
     assert "banners" not in load_prompt("extractor", json_schema="{}")

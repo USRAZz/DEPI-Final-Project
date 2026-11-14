@@ -6,7 +6,7 @@ from pathlib import Path
 
 PROMPTS_DIR = Path(os.getenv("PROMPTS_DIR") or Path(__file__).resolve().parents[1] / "prompts")
 _VAR = re.compile(r"\{\{\s*(\w+)\s*\}\}")
-DEFAULT_VERSIONS = {"extractor": "v2"}  # v2: vendor rule ignores page banners (eval/OCR_BENCHMARK.md)
+DEFAULT_VERSIONS = {"extractor": "v3"}  # v3: vendor rule ignores page banners, scoped to vendor_name (eval/OCR_BENCHMARK.md)
 
 
 def load_prompt(name: str, **variables) -> str:
