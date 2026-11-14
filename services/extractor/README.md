@@ -6,6 +6,6 @@ Reads untrusted invoices (PDF/image), runs OCR, and asks an isolated LLM (no too
 Anything outside the schema fails validation (`extra="forbid"`) → status NEEDS-REVIEW. The agent never sees raw text.
 
 **Endpoints:** `POST /v1/extract` (file → `InvoiceData`), `GET /health`
-**Prompt:** `prompts/extractor_v1.md` (P-02)
+**Prompt:** `prompts/extractor_v2.md` (P-02; default since v2 fixed vendor names, `PROMPT_VERSION_EXTRACTOR=v1` pins the old one)
 
 Run alone: `pip install -e ../../contracts -r requirements-dev.txt && uvicorn app.main:app --reload --port 8004 && pytest`
