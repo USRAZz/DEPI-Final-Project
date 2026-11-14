@@ -179,6 +179,22 @@ def test_empty_llm_reply_fails_the_invoice_instead_of_crashing(tmp_path, monkeyp
     r = pipeline.process_invoice(inv, llm_extract=llm, llm_categorize=FakeLLM(CATEGORY), seen={})
     assert r.status == "FAILED" and "ran out of tokens" in r.issues[0]
 
+
+def test_empty_llm_reply_is_asked_again_once(monkeypatch):
+    from types import SimpleNamespace
+    from pydantic import BaseModel
+    from ai_core.llm import LLM
+
+    class One(BaseModel):
+        a: int
+
+    monkeypatch.setenv("OPENAI_API_KEY", "test")
+    llm = LLM("openai", "m")
+    reply = lambda text, why: SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content=text), finish_reason=why)])
+    replies = [reply("", "length"), reply('{"a": 1}', "stop")]
+    monkeypatch.setattr(llm, "_create", lambda kw: replies.pop(0))
+    assert llm.structured([{"role": "user", "content": "x"}], One).a == 1 and not replies
+
 class FakePaddle:
     """Returns page-pixel boxes; for the 2x header crop it returns them in crop pixels, like PaddleOCR."""
 

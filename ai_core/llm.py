@@ -136,7 +136,11 @@ class LLM:
         """Ask for JSON, validate it against a Pydantic model, and retry once with the error message."""
         msgs, err = list(messages), None
         for _ in range(retries + 1):
-            raw = self.chat(msgs, json_mode=True, budget=budget)
+            try:
+                raw = self.chat(msgs, json_mode=True, budget=budget)
+            except StructuredOutputError as e:  # empty reply: local JSON mode sometimes emits only whitespace, ask again
+                err = e
+                continue
             try:
                 return schema.model_validate(_extract_json(raw))
             except ValueError as e:  # JSON errors and Pydantic ValidationError both inherit ValueError
