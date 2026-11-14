@@ -167,6 +167,18 @@ def test_amount_tokens_are_dropped_from_the_second_reading():
     assert " ".join(w for w in line.split() if not ocr._AMOUNT.fullmatch(w)) == "خدمة صيانة"
 
 
+def test_empty_llm_reply_fails_the_invoice_instead_of_crashing(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+    from ai_core.llm import LLM
+    monkeypatch.setenv("OPENAI_API_KEY", "test")
+    llm = LLM("openai", "m")
+    out_of_tokens = SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content=""), finish_reason="length")])
+    monkeypatch.setattr(llm, "_create", lambda kw: out_of_tokens)
+    inv = tmp_path / "inv.txt"
+    inv.write_text("Nile Office invoice A-1 total 114 EGP, paper 100 + tax 14", encoding="utf-8")
+    r = pipeline.process_invoice(inv, llm_extract=llm, llm_categorize=FakeLLM(CATEGORY), seen={})
+    assert r.status == "FAILED" and "ran out of tokens" in r.issues[0]
+
 class FakePaddle:
     """Returns page-pixel boxes; for the 2x header crop it returns them in crop pixels, like PaddleOCR."""
 

@@ -121,7 +121,7 @@ class LLM:
         r = self._create(kw)
         text = r.choices[0].message.content or ""
         if not text.strip() and r.choices[0].finish_reason == "length":
-            raise RuntimeError("empty reply: the model ran out of tokens (thinking models?). Raise LLM_MAX_TOKENS")
+            raise StructuredOutputError("empty reply: the model ran out of tokens (thinking models?). Raise LLM_MAX_TOKENS")
         u = getattr(r, "usage", None)
         pt, ct = (getattr(u, "prompt_tokens", 0) or 0), (getattr(u, "completion_tokens", 0) or 0)
         self.usage.calls += 1
