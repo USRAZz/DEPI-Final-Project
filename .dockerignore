@@ -1,0 +1,10 @@
+# Never send these to a docker build (owner: M4 Ziad)
+.env
+.env.*
+!.env.example
+backups/
+.git/
+**/__pycache__/
+**/.pytest_cache/
+**/node_modules/
+n8n/credentials.json

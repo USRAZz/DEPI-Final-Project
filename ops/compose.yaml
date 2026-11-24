@@ -5,7 +5,7 @@ services:
       context: ..
       dockerfile: ops/backup/Dockerfile
     profiles: [ops]
-    restart: on-failure
+    restart: on-failure:3  # a wrong URL stops after 3 tries instead of looping forever
     environment:
       # A login that bypasses row-level security (ops/backup/create_backup_role.sql). No default on purpose:
       # backup.py refuses a login that would silently leave approvals and audit_log out of the backup.
@@ -13,7 +13,8 @@ services:
       BACKUP_KEEP: ${BACKUP_KEEP:-14}
       BACKUP_INTERVAL_HOURS: ${BACKUP_INTERVAL_HOURS:-24}
     volumes: [backups:/backups]
-    depends_on: [postgres]
+    # no depends_on: starting the backup must never (re)create the database container, and with Neon
+    # there is no local postgres to wait for
 
 volumes:
   backups:

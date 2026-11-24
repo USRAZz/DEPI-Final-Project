@@ -26,6 +26,7 @@ from datetime import UTC, datetime
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import pgutil  # noqa: E402
+import psycopg  # noqa: E402
 
 
 def sha256(path: pathlib.Path) -> str:
@@ -67,19 +68,27 @@ def main(argv=None) -> int:
     out_dir.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     dump = out_dir / f"securefin-{stamp}.dump"
-    manifest = pgutil.snapshot(url)  # counted just before the dump, in the same login
-
     tmp = dump.with_suffix(".partial")
-    result = subprocess.run([pgutil.tool("pg_dump"), "--format=custom", "--no-password", f"--file={tmp}",
-                             f"--dbname={url}"], capture_output=True, text=True)
+    bare_url, env = pgutil.split_password(url)  # password via PGPASSWORD, never on the command line
+
+    # Count and dump from ONE snapshot: the gateway keeps appending audit rows, and counts taken a moment
+    # before pg_dump would not match the dump (restore_check would then fail a good backup).
+    with psycopg.connect(url, autocommit=True) as c:  # autocommit: our BEGIN sets the isolation level
+        c.execute("BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY")
+        snapshot_id = c.execute("SELECT pg_export_snapshot()").fetchone()[0]
+        manifest = pgutil.snapshot(conn=c)
+        result = subprocess.run([pgutil.tool("pg_dump"), "--format=custom", "--no-password", f"--snapshot={snapshot_id}",
+                                 f"--file={tmp}", f"--dbname={bare_url}"], capture_output=True, text=True, env=env)
+        c.execute("ROLLBACK")
     if result.returncode != 0:
         tmp.unlink(missing_ok=True)
         print(result.stderr.strip(), file=sys.stderr)
         return result.returncode
-    shutil.move(tmp, dump)
-    manifest.update({"file": dump.name, "bytes": dump.stat().st_size, "sha256": sha256(dump),
+    manifest.update({"file": dump.name, "bytes": tmp.stat().st_size, "sha256": sha256(tmp),
                      "created_at": datetime.now(UTC).isoformat(timespec="seconds")})
+    # manifest first, then the dump: restore_check only looks at dumps that have one
     dump.with_suffix(".json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+    shutil.move(tmp, dump)
     removed = prune(out_dir, args.keep)
     print(f"backup written: {dump} ({manifest['bytes']} bytes, {sum(manifest['rows'].values())} rows, "
           f"revision {manifest['alembic_revision']})")

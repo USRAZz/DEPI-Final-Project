@@ -22,7 +22,8 @@ needs_pg = pytest.mark.skipif(
     not URL or not all(shutil.which(t) for t in ("pg_dump", "pg_restore", "psql")),
     reason="set TEST_DATABASE_URL and install the PostgreSQL client tools")
 
-DB, OWNER, BACKUP_PW = "securefin_backup_test", "sf_bk_owner", "backup-test-pw"
+DB, OWNER, BACKUP_ROLE = "securefin_backup_test", "sf_test_bk_owner", "sf_test_backup"
+BACKUP_PW = "it's-a-test-pw"  # a quote on purpose: the SQL file must quote it safely
 
 
 def _package(name: str, folder: pathlib.Path):
@@ -33,6 +34,13 @@ def _package(name: str, folder: pathlib.Path):
     sys.modules[name] = pkg
     spec.loader.exec_module(pkg)
     return pkg
+
+
+def _drop_test_roles(c):
+    for role in (BACKUP_ROLE, OWNER):
+        if c.execute("SELECT 1 FROM pg_roles WHERE rolname = %s", (role,)).fetchone():
+            c.execute(f"DROP OWNED BY {role}")
+            c.execute(f"DROP ROLE {role}")
 
 
 def _run(script: str, *args: str) -> subprocess.CompletedProcess:
@@ -48,12 +56,13 @@ def urls():
     from sqlalchemy.engine import make_url
 
     admin = pgutil.libpq_url(URL)
-    with psycopg.connect(admin, autocommit=True) as c:
+    with psycopg.connect(admin, autocommit=True) as c:  # leave no known-password logins behind
         c.execute(f"DROP DATABASE IF EXISTS {DB} WITH (FORCE)")
+        _drop_test_roles(c)
         c.execute(f"DO $$ BEGIN IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '{OWNER}') THEN "
                   f"CREATE ROLE {OWNER} LOGIN CREATEROLE PASSWORD 'owner'; END IF; END $$")
         c.execute(f"CREATE DATABASE {DB} OWNER {OWNER}")
-    subprocess.run(["psql", admin, "-v", "ON_ERROR_STOP=1", "-v", f"pw='{BACKUP_PW}'",
+    subprocess.run(["psql", admin, "-v", "ON_ERROR_STOP=1", "-v", f"pw={BACKUP_PW}", "-v", f"role={BACKUP_ROLE}",
                     "-f", str(REPO / "ops" / "backup" / "create_backup_role.sql")], check=True, capture_output=True)
 
     base = make_url(URL).set(drivername="postgresql+psycopg", database=DB)
@@ -83,10 +92,11 @@ def urls():
                               source_service="gateway", parameters={"payment_request_id": 1}))
     engine.dispose()
     yield {"admin": admin, "owner": pgutil.libpq_url(owner_url),
-           "backup": pgutil.libpq_url(base.set(username="securefin_backup", password=BACKUP_PW)
+           "backup": pgutil.libpq_url(base.set(username=BACKUP_ROLE, password=BACKUP_PW)
                                       .render_as_string(hide_password=False))}
-    with psycopg.connect(admin, autocommit=True) as c:
+    with psycopg.connect(admin, autocommit=True) as c:  # leave no known-password logins behind
         c.execute(f"DROP DATABASE IF EXISTS {DB} WITH (FORCE)")
+        _drop_test_roles(c)
 
 
 @needs_pg

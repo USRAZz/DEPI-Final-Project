@@ -12,8 +12,10 @@ into a scratch database (default securefin_restore_check, dropped first), then c
      (so the grants and RLS policies are proven to work, not only to exist)
   5. the append-only trigger still refuses an UPDATE on audit_log
 
---url is a login that may CREATE DATABASE and SET ROLE securefin_gateway (a superuser locally and in CI; on Neon
-the project owner). It never touches the database the backup came from. Exit code 0 = restore proven.
+--url is a superuser of a server you can throw away (local Docker postgres or CI): it creates the scratch
+database and, if missing, the NOLOGIN roles securefin_app/securefin_gateway that the dump's grants and policies
+name (roles are per server and not in a dump). It never touches the database the backup came from.
+Exit code 0 = restore proven.
 --keep-db leaves the scratch database for inspection.
 """
 from __future__ import annotations
@@ -35,6 +37,8 @@ sys.path.insert(0, str(HERE))
 import pgutil  # noqa: E402
 from backup import sha256  # noqa: E402
 
+APP_ROLES = ("securefin_app", "securefin_gateway")
+
 
 def gateway_audit_log():
     """services/gateway/app loaded as package securefin_gateway (every service is a package named app)."""
@@ -48,9 +52,9 @@ def gateway_audit_log():
 
 
 def newest_dump(backup_dir: pathlib.Path) -> pathlib.Path:
-    dumps = sorted(backup_dir.glob("securefin-*.dump"))
+    dumps = sorted(d for d in backup_dir.glob("securefin-*.dump") if d.with_suffix(".json").exists())
     if not dumps:
-        raise SystemExit(f"no securefin-*.dump in {backup_dir}")
+        raise SystemExit(f"no securefin-*.dump with its .json manifest in {backup_dir}")
     return dumps[-1]
 
 
@@ -58,10 +62,17 @@ def restore(dump: pathlib.Path, admin_url: str, scratch: str) -> str:
     with psycopg.connect(admin_url, autocommit=True) as c:
         c.execute(sql.SQL("DROP DATABASE IF EXISTS {} WITH (FORCE)").format(sql.Identifier(scratch)))
         c.execute(sql.SQL("CREATE DATABASE {}").format(sql.Identifier(scratch)))
+        # Roles live in the server, not in the dump: a fresh server needs them before the GRANTs and policies
+        # that name them can be restored (same NOLOGIN roles as migration 0001).
+        for role in APP_ROLES:
+            c.execute(sql.SQL("DO $$ BEGIN IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = {r}) THEN "
+                              "CREATE ROLE {i} NOLOGIN; END IF; END $$").format(r=sql.Literal(role), i=sql.Identifier(role)))
+            c.execute(sql.SQL("GRANT {} TO CURRENT_USER").format(sql.Identifier(role)))
     url = pgutil.with_database(admin_url, scratch)
+    bare_url, env = pgutil.split_password(url)  # password via PGPASSWORD, never on the command line
     # --no-owner: the restoring login owns the copy; grants to securefin_app/securefin_gateway are kept
     result = subprocess.run([pgutil.tool("pg_restore"), "--no-owner", "--exit-on-error", "--no-password",
-                             f"--dbname={url}", str(dump)], capture_output=True, text=True)
+                             f"--dbname={bare_url}", str(dump)], capture_output=True, text=True, env=env)
     if result.returncode != 0:
         raise SystemExit("pg_restore failed:\n" + result.stderr.strip())
     return url

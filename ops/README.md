@@ -5,7 +5,9 @@
 ### What is backed up
 
 Everything in the SecureFin database: schema, data, grants, row-level security policies and triggers, as one
-`pg_dump` custom-format file. Next to each dump is a manifest (`.json`) with the Alembic revision, the row count of
+`pg_dump` custom-format file. Not in it: the server's roles (`securefin_app`, `securefin_gateway`), which
+`restore_check.py` creates before restoring. The row counts in the manifest come from the same snapshot as the
+dump, so rows written during the backup cannot make a good backup look wrong. Next to each dump is a manifest (`.json`) with the Alembic revision, the row count of
 every table and the dump's sha256, so a restore can be *proven* rather than assumed.
 
 | File | Job |
@@ -28,14 +30,15 @@ refuses (exit 3) a login that would produce an incomplete backup.
 
 ```bash
 # local / Docker Postgres: as the superuser
-psql "postgresql://securefin:securefin@localhost:5432/securefin" -v pw="'<long random password>'" \
-     -f ops/backup/create_backup_role.sql
+psql "postgresql://securefin:securefin@localhost:5432/securefin" -v ON_ERROR_STOP=1 \
+     -v pw='<long random password>' -f ops/backup/create_backup_role.sql
 # .env
 BACKUP_DATABASE_URL=postgresql://securefin_backup:<password>@postgres:5432/securefin
 ```
 
-**Neon:** roles made in the Neon console get `BYPASSRLS` through `neon_superuser`, so either run the script
-as the project owner or create a dedicated role in the console. Use the **direct** host (no `-pooler`):
+**Neon:** Neon's docs say roles made in the console get `BYPASSRLS`; check yours with
+`SELECT rolbypassrls FROM pg_roles WHERE rolname = current_user` (backup.py refuses with exit 3 if it is false),
+or run the script as the project owner to make a dedicated role. Use the **direct** host (no `-pooler`):
 `pg_dump` uses session `SET`s that the pooler does not support. Neon also keeps point-in-time history of its own;
 these dumps are the copy that is independent of Neon.
 
@@ -44,6 +47,8 @@ these dumps are the copy that is independent of Neon.
 ```bash
 docker compose --profile ops up -d backup        # runs now, then every BACKUP_INTERVAL_HOURS
 docker compose --profile ops logs backup         # "backup written: /backups/securefin-...dump (… rows …)"
+# on a staging/production server add the deploy override so nothing else is recreated with local settings:
+docker compose -f docker-compose.yml -f ops/deploy/compose.deploy.yaml --profile ops up -d --no-deps backup
 # or by hand (pg_dump 16+ on PATH):
 python ops/backup/backup.py --url "$BACKUP_DATABASE_URL" --out-dir backups
 ```
@@ -54,7 +59,8 @@ The dumps hold invoices, IBANs and the audit log: keep them off public storage, 
 ### Prove a restore (monthly, and after every schema change)
 
 ```bash
-python ops/backup/restore_check.py --url "postgresql://postgres:<pw>@localhost:5432/postgres" --backup-dir backups
+# a throwaway server, e.g.: docker run -d --rm -e POSTGRES_PASSWORD=x -p 55432:5432 postgres:16
+python ops/backup/restore_check.py --url "postgresql://postgres:x@localhost:55432/postgres" --backup-dir backups
 ```
 
 It never touches the source database. It restores into `securefin_restore_check` and fails unless:
@@ -73,10 +79,12 @@ data below.
 
 1. Stop writers: `docker compose stop api gateway agent`.
 2. Run `restore_check.py` on the dump you mean to use. Do not restore a dump that fails it.
-3. Restore into a **new** database, never over the damaged one:
+3. Restore into a **new** database, never over the damaged one (the roles `securefin_app` and
+   `securefin_gateway` must already exist on that server, as they do wherever migration 0001 ran):
    `createdb securefin_restored && pg_restore --no-owner --exit-on-error -d securefin_restored <file>.dump`
 4. Point `DATABASE_URL` at it, start the services, and check every company's chain:
-   `curl -X POST localhost:8002/v1/audit/verify -H "Content-Type: application/json" -H "X-Service-Token: $AUDIT_VERIFY_TOKEN" -d '{"company_id": 1}'`
+   from inside the stack (the gateway port is not published on servers):
+   `docker compose exec gateway python -c "import json,os,urllib.request as u; r=u.Request('http://localhost:8000/v1/audit/verify', json.dumps({'company_id': 1}).encode(), {'Content-Type': 'application/json', 'X-Service-Token': os.environ['AUDIT_VERIFY_TOKEN']}); print(u.urlopen(r).read())"`
    (expect `"ok": true`).
 5. Keep the damaged database until the incident is written up.
 
