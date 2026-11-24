@@ -1,0 +1,40 @@
+# Backup and restore drill (owner: M4 Ziad). Proves on a throwaway PostgreSQL that a backup taken with the backup
+# login restores with every row, intact audit chains and the append-only trigger (tests/test_backup_restore.py).
+# Runs when the backup scripts or the schema change, on the 1st of every month, and by hand (Actions -> Run).
+name: Backup drill
+on:
+  pull_request:
+    paths: ["ops/backup/**", "services/api/migrations/**", "tests/test_backup_restore.py", ".github/workflows/backup-drill.yml"]
+  push:
+    branches: [dev, main]
+    paths: ["ops/backup/**", "services/api/migrations/**", "tests/test_backup_restore.py"]
+  schedule:
+    - cron: "17 3 1 * *"  # 03:17 UTC on the 1st
+  workflow_dispatch:
+
+jobs:
+  drill:
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:16
+        env: { POSTGRES_PASSWORD: test }
+        ports: ["5432:5432"]
+        options: --health-cmd pg_isready --health-interval 5s --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgresql+psycopg://postgres:test@localhost:5432/postgres
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - name: PostgreSQL 16 client tools (pg_dump must match the server)
+        run: |
+          sudo apt-get update -q && sudo apt-get install -yq postgresql-client-16
+          echo /usr/lib/postgresql/16/bin >> "$GITHUB_PATH"
+      - run: pip install ./contracts pytest ruff -r services/api/requirements.txt -r services/gateway/requirements.txt
+      - run: ruff check ops tests/test_backup_restore.py
+      - name: Drill must run, not skip
+        run: |
+          set -o pipefail
+          pytest -q -rs tests/test_backup_restore.py | tee drill.txt
+          ! grep -q SKIPPED drill.txt

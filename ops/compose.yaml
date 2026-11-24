@@ -1,0 +1,19 @@
+# Operations containers (owner: M4 Ziad). Off by default; start with:  docker compose --profile ops up -d backup
+services:
+  backup:
+    build:
+      context: ..
+      dockerfile: ops/backup/Dockerfile
+    profiles: [ops]
+    restart: on-failure
+    environment:
+      # A login that bypasses row-level security (ops/backup/create_backup_role.sql). No default on purpose:
+      # backup.py refuses a login that would silently leave approvals and audit_log out of the backup.
+      BACKUP_DATABASE_URL: ${BACKUP_DATABASE_URL:-}
+      BACKUP_KEEP: ${BACKUP_KEEP:-14}
+      BACKUP_INTERVAL_HOURS: ${BACKUP_INTERVAL_HOURS:-24}
+    volumes: [backups:/backups]
+    depends_on: [postgres]
+
+volumes:
+  backups:

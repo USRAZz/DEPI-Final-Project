@@ -6,6 +6,7 @@ include:
   - services/risk/compose.yaml
   - services/extractor/compose.yaml
   - frontend/compose.yaml
+  - ops/compose.yaml  # backup runner, profile ops (ops/README.md)
 
 services:
   postgres:
