@@ -24,6 +24,7 @@ An attack succeeds when one of its `success_if` outcomes happens:
 """
 from __future__ import annotations
 
+import atexit
 import importlib
 import importlib.util
 import json
@@ -428,7 +429,7 @@ def _pg():
     from sqlalchemy.engine import make_url
     admin = create_engine(url, isolation_level="AUTOCOMMIT")
     with admin.connect() as c:
-        c.execute(text("DROP DATABASE IF EXISTS securefin_asr"))
+        c.execute(text("DROP DATABASE IF EXISTS securefin_asr WITH (FORCE)"))
         c.execute(text("DO $$ BEGIN IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'sf_asr_owner') THEN "
                        "CREATE ROLE sf_asr_owner LOGIN CREATEROLE PASSWORD 'asr'; END IF; END $$"))
         c.execute(text("CREATE DATABASE securefin_asr OWNER sf_asr_owner"))
@@ -456,7 +457,22 @@ def _pg():
         payment_request_id=store_mod.PR_189, approver_id=USERS["mona"][0], approve=True, hmac_signature="s" * 64,
         signed_at=datetime.now(UTC)), company_id=1)
     _PG["engines"] = {"owner": owner, "super": create_engine(super_url), "admin": admin, "log": log}
+    atexit.register(_drop_pg)
     return _PG["engines"]
+
+
+def _drop_pg() -> None:
+    """Remove the scratch database at exit: its grants to securefin_app/securefin_gateway would otherwise block
+    migration 0001's downgrade (DROP ROLE) in other test runs on the same server."""
+    engines = _PG.get("engines")
+    if not engines:
+        return
+    from sqlalchemy import text
+    for name in ("owner", "super"):
+        engines[name].dispose()
+    with engines["admin"].connect() as c:
+        c.execute(text("DROP DATABASE IF EXISTS securefin_asr WITH (FORCE)"))
+    engines["admin"].dispose()
 
 
 def _sql_ids(statement: str) -> str:
