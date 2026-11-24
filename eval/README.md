@@ -1,15 +1,31 @@
 # eval/ — Evaluation harness (owner: M4 Ziad)
 
-- `attack_suite/` — labelled malicious documents & prompts (target 50–100; 22 now). One JSON per case:
-  `{"id", "scenario", "category", "description", "input": {"type": ...}, "expected", "unsafe_if"}`.
-  Scenarios: A `prompt_injection` (hidden instructions in a document or chat), B `self_approval`
-  (maker-checker bypass), C `iban_swap` (bank-account change), D `audit_tamper` (editing approvals / audit log).
-  Input types: `invoice_text`, `chat_message`, `api_sequence`, `proposed_action`, `sql`.
-  `expected` is what a safe system returns (`BLOCK`, `PENDING_APPROVAL`, `NEEDS-REVIEW`, `FLAGGED`,
-  `VENDOR_CHANGE_PENDING`, `DENIED` for a database permission error, `CHAIN_BROKEN` for the hash-chain check).
-  `tests/test_attack_suite.py` checks every file.
+- `attack_suite/` — 100 labelled attacks, one JSON per case: 35 prompt injection (A), 25 self-approval /
+  approval abuse (B), 20 bank-detail swap (C), 20 audit / approval tampering (D).
+  `{"id", "scenario", "category", "description", "input", "expected", "unsafe_if", "attack"}`.
+  `input` describes the attack for people; `attack` makes it executable:
+  - `kind`: `invoice` (text through the real extractor, risk features, risk score, gateway), `agent_action`
+    (proposals straight to the gateway), `approval_flow` (api + gateway approval and execute endpoints),
+    `sql` (statements under the database roles, or the hash-chain check), `not_executable` (with `reason`).
+  - `success_if`: which outcomes mean the attack worked (`executed`, `executed_twice`, `paid_to_attacker_iban`,
+    `not_flagged`, `approved`, `stored`, `undetected`).
+  - `llm_fields` / `proposes`: what a fully hijacked model emits. The run assumes the worst model, so it measures
+    the controls, not the model.
+  - `known_gap`: set only on a case that still gets through, with the reason (see the report).
+  `expected` is the outcome with the controls on (`BLOCK`, `PENDING_APPROVAL`, `FLAGGED`, `NEEDS-REVIEW`, `DENIED`,
+  `NO_ROWS` for a read or write that touches nothing, `CHAIN_BROKEN`).
+- `asr_harness.py` + `run_asr.py` — run every case with the controls **on** and **off** and report the attack
+  success rate (ASR). Controls off = no gateway, no database roles / row-level security / append-only trigger,
+  no hash-chain check; extractor checks and risk features still run.
+  `ASR_REPORT.md` is the latest run (regenerate it, do not edit it). CI job `eval` runs the suite on every PR and
+  fails if an attack gets through that is not a documented gap. `tests/test_attack_suite.py` checks every file.
+
+  ```powershell
+  python eval/run_asr.py                                   # in-memory cases (SQL cases are skipped)
+  $env:ASR_DATABASE_URL = "postgresql+psycopg://postgres:pw@localhost:5432/postgres"
+  python eval/run_asr.py --report eval/ASR_REPORT.md       # all 100; creates a database called securefin_asr
+  ```
 - `legit_set/` — normal requests & invoices (measures false-block rate).
-- `run_asr.py` — ASR experiment skeleton. It is not runnable yet; `run_case()` still needs the API integration.
 - `ocr_benchmark.py` — runs either Tesseract (`ara+eng`) or PaddleOCR on the 130 image-only invoice PDFs and writes per-invoice field-hit and latency results under ignored `eval/results/`. PaddleOCR sorts Arabic word boxes right-to-left, runs Arabic and English recognition on Arabic/mixed pages, and defaults to a sharpened 2x grayscale OCR pass on the supplier header. The full-page grayscale/autocontrast/upscale/sharpen experiment (`--preprocess enhance`) reduced PaddleOCR accuracy, so original images remain the default outside the targeted header crop.
 - `--paddle-item-crop-pass` — optional experimental 2x OCR pass on the middle/lower invoice region. On the current synthetic set it improved normalized field recall from 96.5% to 96.7%, while increasing mean CPU time from 4.68 to 9.60 seconds per invoice. It is off by default until downstream extraction precision is checked; see `OCR_BENCHMARK.md`.
 - `--paddle-focused-fields-pass` — adds 3x crops for the Arabic header, RTL description column, and lower-right amount area. On the 33-invoice failed subset, it raised normalized recall from 89.0% to 90.5% with no field regressions, while increasing mean latency from 8.34 to 14.75 seconds/page. It remains opt-in; see `OCR_BENCHMARK.md`.

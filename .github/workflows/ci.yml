@@ -63,6 +63,36 @@ jobs:
       - run: cd services/api && pytest -q tests/test_migrations.py
       - run: cd services/gateway && pytest -q tests/test_db_store_audit.py
 
+  eval:
+    # Attack suite (eval/attack_suite, 100 cases) against the real services in one process, SQL cases on PostgreSQL.
+    # Fails if an attack gets through that is not a documented gap; the report is kept as a build artifact.
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env: { POSTGRES_PASSWORD: test }
+        ports: ["5432:5432"]
+        options: --health-cmd pg_isready --health-interval 5s --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgresql+psycopg://postgres:test@localhost:5432/postgres
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: >-
+          pip install ./contracts pytest
+          -r services/api/requirements.txt -r services/gateway/requirements.txt
+          -r services/risk/requirements.txt -r services/extractor/requirements.txt -r services/agent/requirements.txt
+      - run: pytest -q tests
+      - run: python eval/run_asr.py --fail-on-new --report asr-report.md --json asr-results.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: asr-report
+          path: |
+            asr-report.md
+            asr-results.json
+
   frontend:
     runs-on: ubuntu-latest
     steps:
