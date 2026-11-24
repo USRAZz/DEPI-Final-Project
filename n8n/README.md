@@ -9,7 +9,7 @@ access. If n8n is down, payments are still held or blocked correctly; only messa
 powershell -ExecutionPolicy Bypass -File n8n\demo.ps1
 ```
 
-This starts a throwaway n8n on port 5680 with the four workflows published, and prints four links. Each link is
+This starts a throwaway n8n on port 5680 with the five workflows published, and prints five links. Each link is
 a **Test form**: the fields are already filled in, you press **Run**, and the result appears on the screen.
 Nothing is sent or stored, and no `.env`, credential or account is needed.
 
@@ -19,6 +19,7 @@ Nothing is sent or stored, and no `.env`, credential or account is needed.
 | `/form/securefin-test-intake` | any invoice file from the project, e.g. `tests/fixtures/synthetic/clear_invoices_20/STRESS3-001.pdf` | the "new invoice" message with the file's SHA-256 name (compare with `Get-FileHash`) |
 | `/form/securefin-test-notify` | a decision (hold / block / second approval / bank change), a number, reasons | the Arabic + English message for the approver |
 | `/form/securefin-test-integrity` | what the check should find (all good / edited row / deleted rows / attack got through) | the scorecard, OK or FAILED |
+| `/form/securefin-test-health` | the services that should look down, e.g. `extractor, gateway` | the DOWN alert the team would get |
 
 Remove it with `powershell -ExecutionPolicy Bypass -File n8n\demo.ps1 -Stop`.
 
@@ -34,10 +35,11 @@ you connect one: you fill in its URL in `.env` and restart n8n.
 
 | File in `workflows/` | Standalone (URL empty, the default) | Connected (set in `.env`) |
 |---|---|---|
-| `0-error-alerts.json` | Any failed run in the other three → Telegram, email if Telegram fails | same, no service needed |
+| `0-error-alerts.json` | Any failed run in the others → Telegram, email if Telegram fails | same, no service needed |
 | `1-invoice-email-intake.json` | Invoice email → Telegram "new invoice received" with the sender and the file hash; the same file is announced once. Nothing is stored | `N8N_INVOICE_UPLOAD_URL` + `N8N_INTAKE_TOKEN`: uploads to the api (Karim's endpoint, not built yet) |
 | `2-decision-notifications.json` | Send events yourself with `n8n/tools/send_event.py` → Arabic + English Telegram message | the gateway posts the same signed event (Anan, not built yet); no setting changes in n8n |
 | `3-nightly-integrity-run.json` | Runs on **simulated** answers; every report starts with "DEMO MODE: simulated data, nothing real was checked" | `N8N_AUDIT_VERIFY_URL` + `AUDIT_VERIFY_TOKEN` (endpoint on branch `feat/gateway/db-store-audit`); `N8N_ATTACK_RUN_URL` when the attack runner exists |
+| `4-health-watch.json` | `N8N_HEALTH_URLS` empty: watches nothing | every 5 min `GET /health` on each service; alerts (through 0) when one goes down, every hour while it stays down (no message on recovery). Unset by default so the n8n-only demo does not alert on services that are not running. Same checks by hand: `python ops/monitor/check_health.py` |
 
 Standalone integrity demo (the alert arrives on Telegram through workflow 0):
 
@@ -71,7 +73,7 @@ Both modes were tested: standalone with no service URL set, connected against th
 4. Workflows (repeat after every change to the JSON; importing un-publishes, so publish again):
 
    ```bash
-   docker compose exec n8n sh -c 'n8n import:workflow --separate --input=/workflows && for w in sfErrorAlerts0001 sfInvoiceIntake001 sfDecisionNotify01 sfIntegrityRun001; do n8n publish:workflow --id=$w; done'
+   docker compose exec n8n sh -c 'n8n import:workflow --separate --input=/workflows && for w in sfErrorAlerts0001 sfInvoiceIntake001 sfDecisionNotify01 sfIntegrityRun001 sfHealthWatch0001; do n8n publish:workflow --id=$w; done'
    docker compose restart n8n
    ```
 

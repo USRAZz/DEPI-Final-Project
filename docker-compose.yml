@@ -16,6 +16,11 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-securefin}
     ports: ["5432:5432"]
     volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-securefin} -d $${POSTGRES_DB:-securefin}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   # Optional automation (n8n/README.md). Start with: docker compose --profile n8n up -d n8n
   # n8n only notifies and reports. It gets no database URL and no approval key: it calls service APIs with its own
@@ -59,6 +64,9 @@ services:
       N8N_EVAL_TOKEN: ${N8N_EVAL_TOKEN:-}
       N8N_ATTACK_MIN_CASES: ${N8N_ATTACK_MIN_CASES:-22}
       N8N_HEARTBEAT_URL: ${N8N_HEARTBEAT_URL:-}
+      # 4 service health watch (every 5 min). Empty = watch nothing. In compose:
+      # api=http://api:8000/health,agent=http://agent:8000/health,gateway=http://gateway:8000/health,risk=http://risk:8000/health,extractor=http://extractor:8000/health
+      N8N_HEALTH_URLS: ${N8N_HEALTH_URLS:-}
     volumes:
       - n8n_data:/home/node/.n8n  # credentials, published workflows, seen event ids, last-OK time
       - ./n8n/workflows:/workflows:ro

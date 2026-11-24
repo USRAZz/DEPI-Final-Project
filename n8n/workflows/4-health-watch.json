@@ -1,0 +1,335 @@
+{
+  "id": "sfHealthWatch0001",
+  "name": "4 Service health watch",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 5
+            }
+          ]
+        }
+      },
+      "id": "h1",
+      "name": "Every 5 minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "path": "securefin-test-health",
+        "formTitle": "Test 4: service health watch",
+        "formDescription": "Type the services that should look down (comma separated: api, agent, gateway, risk, extractor). Nothing is called and no alert is sent; the message the team would get is shown here.",
+        "formFields": {
+          "values": [
+            {
+              "fieldName": "down",
+              "fieldLabel": "Services that are down",
+              "fieldType": "text",
+              "defaultValue": "extractor"
+            }
+          ]
+        },
+        "responseMode": "responseNode",
+        "options": {
+          "buttonLabel": "Run",
+          "customCss": "#submitted-content { white-space: pre-line; text-align: start; }"
+        }
+      },
+      "id": "h2",
+      "name": "Test form",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        200
+      ],
+      "webhookId": "securefin-test-health"
+    },
+    {
+      "parameters": {
+        "jsCode": "const env = (k) => { try { return String($env[k] ?? ''); } catch (e) { return ''; } };  // '' when unset or blocked\n// Which services to watch. N8N_HEALTH_URLS = \"api=http://api:8000/health,gateway=http://gateway:8000/health,...\"\n// Empty (the default) = standalone: nothing to watch, the run ends here. The test form simulates instead.\nconst SERVICES = ['api', 'agent', 'gateway', 'risk', 'extractor'];\nif ($('Test form').isExecuted) {\n  const down = String($('Test form').first().json['Services that are down'] ?? '').split(',').map((s) => s.trim()).filter(Boolean);\n  return SERVICES.map((name) => ({ json: { name, simulated: true, up: !down.includes(name) } }));\n}\nconst urls = env('N8N_HEALTH_URLS').split(',').map((s) => s.trim()).filter(Boolean);\nreturn urls.map((pair) => {\n  const i = pair.indexOf('=');\n  if (i < 1) throw new Error(`N8N_HEALTH_URLS entry \"${pair}\" is not name=url`);\n  return { json: { name: pair.slice(0, i).trim(), url: pair.slice(i + 1).trim(), simulated: false } };\n});"
+      },
+      "id": "h3",
+      "name": "Services",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.simulated }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "h4",
+      "name": "Simulated?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        440,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.url }}",
+        "options": {
+          "timeout": 5000,
+          "response": {
+            "response": {
+              "neverError": true,
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "id": "h5",
+      "name": "GET /health",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        660,
+        200
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Turns the answers into up/down and alerts only on a change, plus a reminder every hour while still down.\n// n8n decides nothing about payments: if this watch is wrong, only a message is wrong.\nconst test = $('Test form').isExecuted;\nconst asked = $('Services').all();\nconst results = $input.all().map((item, i) => {\n  const name = asked[i].json.name;\n  if (asked[i].json.simulated) return { name, up: asked[i].json.up, why: asked[i].json.up ? 'ok' : 'simulated: no answer' };\n  const r = item.json;\n  const up = r.statusCode === 200 && (r.body ?? {}).status === 'ok';\n  const why = up ? 'ok' : r.error ? String(r.error.message ?? r.error).slice(0, 80) : `HTTP ${r.statusCode ?? 'none'}`;\n  return { name, up, why };\n});\nconst now = Date.now();\nconst stamp = (ms) => new Date(ms).toISOString().slice(0, 16).replace('T', ' ') + ' UTC';\nconst state = test ? { down: {} } : $getWorkflowStaticData('global');  // test runs never touch the real state\nstate.down = state.down ?? {};\nconst newly = [], still = [], recovered = [];\nfor (const r of results) {\n  const since = state.down[r.name];\n  if (!r.up && since === undefined) { state.down[r.name] = now; newly.push(r); }\n  else if (!r.up) still.push({ ...r, since });\n  else if (since !== undefined) { delete state.down[r.name]; recovered.push({ ...r, since }); }\n}\nconst remind = still.length > 0 && now - (state.last_alert ?? 0) >= 3600000;\nconst alert = newly.length > 0 || remind;\nif (alert && !test) state.last_alert = now;\nconst lines = [];\nfor (const r of newly) lines.push(`DOWN  ${r.name}: ${r.why}`);\nfor (const r of still) lines.push(`STILL DOWN  ${r.name} since ${stamp(r.since)}: ${r.why}`);\nfor (const r of recovered) lines.push(`RECOVERED  ${r.name} (was down since ${stamp(r.since)})`);\nconst up = results.filter((r) => r.up).map((r) => r.name);\nconst head = (test ? 'TEST (simulated, nothing was called): ' : '') + (newly.length || still.length ? 'SecureFin services DOWN' : 'SecureFin services all up');\nconst summary = [head, ...lines, `up: ${up.join(', ') || 'none'}`].join('\\n');\nreturn [{ json: { alert, test, summary, down: [...newly, ...still].map((r) => r.name), recovered: recovered.map((r) => r.name) } }];"
+      },
+      "id": "h6",
+      "name": "Verdict",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.test }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "h7",
+      "name": "Started from test form?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { formSubmittedText: $json.summary } }}",
+        "options": {}
+      },
+      "id": "h8",
+      "name": "Show result on screen",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1320,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.alert }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "h9",
+      "name": "Alert?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "errorMessage": "={{ $json.summary }}"
+      },
+      "id": "h10",
+      "name": "Fail the run: alert",
+      "type": "n8n-nodes-base.stopAndError",
+      "typeVersion": 1,
+      "position": [
+        1540,
+        200
+      ]
+    }
+  ],
+  "connections": {
+    "Every 5 minutes": {
+      "main": [
+        [
+          {
+            "node": "Services",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Test form": {
+      "main": [
+        [
+          {
+            "node": "Services",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Services": {
+      "main": [
+        [
+          {
+            "node": "Simulated?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simulated?": {
+      "main": [
+        [
+          {
+            "node": "Verdict",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "GET /health",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GET /health": {
+      "main": [
+        [
+          {
+            "node": "Verdict",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verdict": {
+      "main": [
+        [
+          {
+            "node": "Started from test form?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Started from test form?": {
+      "main": [
+        [
+          {
+            "node": "Show result on screen",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Alert?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Alert?": {
+      "main": [
+        [
+          {
+            "node": "Fail the run: alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "errorWorkflow": "sfErrorAlerts0001",
+    "saveDataSuccessExecution": "none"
+  },
+  "active": false
+}
