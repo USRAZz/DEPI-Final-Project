@@ -1,7 +1,7 @@
 """One-shot health check of a running SecureFin stack (owner: M4 Ziad). Standard library only.
 
     python ops/monitor/check_health.py                      # docker compose on this machine (ports 8000-8004)
-    python ops/monitor/check_health.py --base staging.example.com --json
+    python ops/monitor/check_health.py --base 192.168.1.20 --json   # another machine running local compose
     AUDIT_VERIFY_TOKEN=... python ops/monitor/check_health.py --audit-companies 1,2
 
 Checks GET /health on every service (HTTP 200 and {"status": "ok"}) and, when --audit-companies and

@@ -16,15 +16,18 @@ Plus the monthly backup drill (`ops/README.md`), which fails CI if a backup no l
 ```bash
 python ops/monitor/check_health.py                         # the compose stack on this machine
 AUDIT_VERIFY_TOKEN=... python ops/monitor/check_health.py --audit-companies 1,2
-python ops/monitor/check_health.py --base staging-host --json
+python ops/monitor/check_health.py --json
 ```
+
+`--base`/`--url` work where the ports are published (local compose). On a staging/production server only the
+api is published, on 127.0.0.1, so there the watch is workflow 4 inside the stack's network.
 
 One line per check, `ALL OK` and exit 0, or `SOMETHING IS DOWN` and exit 1. Standard library only, so it runs on
 any machine with Python 3.10+. The token is read from the environment and never printed.
 
 ## Turn the watch on
 
-In `.env`, set `N8N_HEALTH_URLS` (the compose value is in `.env.example`), then re-import and publish the
+In `.env`, set `N8N_HEALTH_URLS` (the compose value is commented in `.env.example`), then re-import and publish the
 workflows (`n8n/README.md`, Set up step 4). It is empty by default, so the n8n-only demo does not report the
 services it is not running as down.
 
