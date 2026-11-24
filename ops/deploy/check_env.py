@@ -10,6 +10,7 @@ backend, the development login left on, a database password still at its default
 from __future__ import annotations
 
 import os
+import re
 import sys
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -69,8 +70,8 @@ def problems(stage: str, env: dict[str, str]) -> list[str]:
             found.append("DATABASE_URL has an empty or default password")
         if stage == "production" and parts.hostname in ("postgres", "localhost", "127.0.0.1"):
             found.append("production DATABASE_URL points at the compose postgres: use the managed database (Neon)")
-    if stage == "production" and env.get("IMAGE_TAG", "") in {"", "latest", "staging"}:
-        found.append("production IMAGE_TAG must be a release tag such as v0.2.0, not latest or staging")
+    if stage == "production" and not re.fullmatch(r"v\d+\.\d+\.\d+", env.get("IMAGE_TAG", "")):
+        found.append("production IMAGE_TAG must be a release tag such as v0.2.0 (not latest, staging or sha-...)")
     shared = [n for n in ("APPROVAL_HMAC_KEY", "INTERNAL_SERVICE_TOKEN", "AUDIT_VERIFY_TOKEN")
               if env.get(n) and list(env.values()).count(env[n]) > 1]
     if shared:

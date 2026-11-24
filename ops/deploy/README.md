@@ -60,7 +60,8 @@ migration, restore the pre-release backup instead (`ops/README.md`, "Restore for
 every production deploy (backup container from `ops/compose.yaml`):
 
 ```bash
-docker compose --profile ops run --rm --entrypoint python3 backup /ops/backup/backup.py --out-dir /backups
+docker compose -f docker-compose.yml -f ops/deploy/compose.deploy.yaml --profile ops \
+    run --rm --no-deps --entrypoint python3 backup /ops/backup/backup.py --out-dir /backups
 ```
 
 ## Known gaps (to fix with their owners)

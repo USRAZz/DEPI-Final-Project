@@ -15,8 +15,8 @@ if [[ -n "${2:-}" ]]; then export IMAGE_TAG="$2"; fi
 
 echo "== 1/5 check .env for $stage"
 python3 ops/deploy/check_env.py "$stage" .env
-if [[ -n "${IMAGE_TAG:-}" && "$stage" == production && ! "$IMAGE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-  echo "production needs a release tag like v0.2.0, got '$IMAGE_TAG'" >&2; exit 1
+if [[ "$stage" == production && -z "${2:-}" ]]; then
+  echo "production deploys name their tag: $0 production vX.Y.Z" >&2; exit 2
 fi
 
 compose=(docker compose -f docker-compose.yml -f ops/deploy/compose.deploy.yaml)

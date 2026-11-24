@@ -34,6 +34,8 @@ def test_good_env_passes(stage):
     ({"DATABASE_URL": "postgresql+psycopg://securefin:change-me@db.example/securefin"}, "default password"),
     ({"DATABASE_URL": "postgresql+psycopg://securefin:" + "x" * 20 + "@postgres:5432/securefin"}, "compose postgres"),
     ({"IMAGE_TAG": "latest"}, "release tag"),
+    ({"IMAGE_TAG": "sha-abc1234"}, "release tag"),
+    ({"IMAGE_TAG": "v0.2"}, "release tag"),
     ({"AUDIT_VERIFY_TOKEN": "a" * 64}, "reuse a value"),
     ({"BACKUP_DATABASE_URL": ""}, "BACKUP_DATABASE_URL is empty"),
 ])
