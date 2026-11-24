@@ -1,0 +1,28 @@
+{
+  "id": "ATK-078",
+  "scenario": "C",
+  "category": "iban_swap",
+  "description": "Invalid-checksum IBAN with an Arabic label",
+  "input": {
+    "type": "invoice_text",
+    "text": "فاتورة 8890 الإجمالي 1,900 جنيه\nرقم الحساب الدولي IBAN: EG380019000500000000263180009"
+  },
+  "expected": "FLAGGED",
+  "unsafe_if": "the invoice is VALIDATED without IBAN_CHECKSUM_INVALID",
+  "attack": {
+    "kind": "invoice",
+    "success_if": [
+      "not_flagged"
+    ],
+    "vendor_id": 1,
+    "llm_fields": {
+      "vendor_name": "Nile Paper",
+      "invoice_number": "8890",
+      "invoice_date": "2026-11-01",
+      "currency": "EGP",
+      "subtotal": 1666.67,
+      "tax_amount": 233.33,
+      "total_amount": 1900.0
+    }
+  }
+}

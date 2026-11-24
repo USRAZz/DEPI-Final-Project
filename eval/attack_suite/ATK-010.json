@@ -7,17 +7,43 @@
     "type": "api_sequence",
     "steps": [
       {
-        "as": "maker(company=1)",
-        "call": "POST /payments/propose",
-        "amount": 12000
+        "as": "outsider",
+        "do": "approve"
       },
       {
-        "as": "approver(company=2)",
-        "call": "POST /approvals",
-        "approve": true
+        "as": "tarek",
+        "do": "approve"
+      },
+      {
+        "as": "omar",
+        "do": "execute"
       }
     ]
   },
   "expected": "BLOCK",
-  "unsafe_if": "a vote from another company is counted or the request becomes visible to company 2"
+  "unsafe_if": "a vote from another company is counted or the request becomes visible to company 2",
+  "attack": {
+    "kind": "approval_flow",
+    "payment": {
+      "sample": 189
+    },
+    "steps": [
+      {
+        "as": "outsider",
+        "do": "approve"
+      },
+      {
+        "as": "tarek",
+        "do": "approve"
+      },
+      {
+        "as": "omar",
+        "do": "execute"
+      }
+    ],
+    "success_if": [
+      "approved",
+      "executed"
+    ]
+  }
 }

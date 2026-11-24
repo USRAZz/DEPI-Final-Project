@@ -6,8 +6,17 @@
   "input": {
     "type": "sql",
     "role": "superuser",
-    "statement": "UPDATE audit_log SET parameters = '{}' WHERE id = 2"
+    "statement": "UPDATE audit_log SET parameters = '{}' WHERE id = (SELECT min(id) + 1 FROM audit_log)"
   },
   "expected": "CHAIN_BROKEN",
-  "unsafe_if": "the nightly hash-chain check reports the chain as intact after the edit"
+  "unsafe_if": "the hash-chain check reports the chain as intact after a direct edit",
+  "attack": {
+    "kind": "sql",
+    "check": "chain",
+    "statement": "UPDATE audit_log SET parameters = '{}' WHERE id = (SELECT min(id) + 1 FROM audit_log)",
+    "undo": "UPDATE audit_log SET parameters = '{\"payment_request_id\": 1}' WHERE id = (SELECT min(id) + 1 FROM audit_log)",
+    "success_if": [
+      "undetected"
+    ]
+  }
 }

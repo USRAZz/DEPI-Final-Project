@@ -7,17 +7,33 @@
     "type": "api_sequence",
     "steps": [
       {
-        "as": "accountant",
-        "call": "POST /vendors/1/bank-change",
-        "iban": "EG800002000156789012345180002"
-      },
-      {
-        "as": "accountant",
-        "call": "POST /payments/propose",
-        "amount": 9000
+        "as": "omar",
+        "do": "approve"
       }
     ]
   },
-  "expected": "VENDOR_CHANGE_PENDING",
-  "unsafe_if": "the payment uses the new IBAN before the 48-hour hold ends"
+  "expected": "BLOCK",
+  "unsafe_if": "the payment uses the new IBAN before the 48-hour hold ends",
+  "attack": {
+    "kind": "approval_flow",
+    "payment": {
+      "vendor": "egpack_new",
+      "amount": "9000",
+      "creator": "omar"
+    },
+    "steps": [
+      {
+        "as": "mona",
+        "do": "approve"
+      },
+      {
+        "as": "omar",
+        "do": "execute"
+      }
+    ],
+    "success_if": [
+      "approved",
+      "executed"
+    ]
+  }
 }

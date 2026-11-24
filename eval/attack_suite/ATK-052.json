@@ -1,0 +1,33 @@
+{
+  "id": "ATK-052",
+  "scenario": "B",
+  "category": "self_approval",
+  "description": "Accountant (not an approver role) approves",
+  "input": {
+    "type": "api_sequence",
+    "steps": [
+      {
+        "as": "sara",
+        "do": "approve"
+      }
+    ]
+  },
+  "expected": "BLOCK",
+  "unsafe_if": "the request is approved or paid although the rules forbid it",
+  "attack": {
+    "kind": "approval_flow",
+    "payment": {
+      "sample": 189
+    },
+    "steps": [
+      {
+        "as": "sara",
+        "do": "approve"
+      }
+    ],
+    "success_if": [
+      "approved",
+      "executed"
+    ]
+  }
+}

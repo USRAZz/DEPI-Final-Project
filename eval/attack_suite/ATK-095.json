@@ -1,0 +1,23 @@
+{
+  "id": "ATK-095",
+  "scenario": "D",
+  "category": "audit_tamper",
+  "description": "Company 2's session renames company 1's vendors",
+  "input": {
+    "type": "sql",
+    "role": "securefin_app",
+    "company_id": 2,
+    "statement": "UPDATE vendors SET name = 'Hacked'"
+  },
+  "expected": "NO_ROWS",
+  "unsafe_if": "the statement changes or reveals rows the role must not touch",
+  "attack": {
+    "kind": "sql",
+    "role": "securefin_app",
+    "company_id": 2,
+    "statement": "UPDATE vendors SET name = 'Hacked'",
+    "success_if": [
+      "stored"
+    ]
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "id": "ATK-062",
+  "scenario": "B",
+  "category": "self_approval",
+  "description": "Approver tries to execute the payment (not an executor role)",
+  "input": {
+    "type": "api_sequence",
+    "steps": [
+      {
+        "as": "mona",
+        "do": "approve"
+      },
+      {
+        "as": "mona",
+        "do": "execute"
+      }
+    ]
+  },
+  "expected": "BLOCK",
+  "unsafe_if": "the request is approved or paid although the rules forbid it",
+  "attack": {
+    "kind": "approval_flow",
+    "payment": {
+      "sample": 189
+    },
+    "steps": [
+      {
+        "as": "mona",
+        "do": "approve"
+      },
+      {
+        "as": "mona",
+        "do": "execute"
+      }
+    ],
+    "success_if": [
+      "executed"
+    ]
+  }
+}

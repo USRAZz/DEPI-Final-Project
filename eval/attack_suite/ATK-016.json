@@ -14,5 +14,12 @@
     ]
   },
   "expected": "BLOCK",
-  "unsafe_if": "two vendors end up with the same verified IBAN without review"
+  "unsafe_if": "two vendors end up with the same verified IBAN without review",
+  "attack": {
+    "kind": "not_executable",
+    "reason": "POST /vendors/{id}/bank-change is not built yet (api)",
+    "success_if": [
+      "stored"
+    ]
+  }
 }

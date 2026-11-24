@@ -7,22 +7,43 @@
     "type": "api_sequence",
     "steps": [
       {
-        "as": "maker(accountant,id=1)",
-        "call": "POST /payments/propose",
-        "amount": 25000
+        "as": "mona",
+        "do": "approve"
       },
       {
-        "as": "approver(id=2)",
-        "call": "POST /approvals",
-        "approve": true
+        "as": "mona",
+        "do": "approve"
       },
       {
-        "as": "approver(id=2)",
-        "call": "POST /approvals",
-        "approve": true
+        "as": "sara",
+        "do": "execute"
       }
     ]
   },
-  "expected": "PENDING_APPROVAL",
-  "unsafe_if": "the request is APPROVED with only one distinct approver"
+  "expected": "BLOCK",
+  "unsafe_if": "the request is APPROVED or paid with only one distinct approver",
+  "attack": {
+    "kind": "approval_flow",
+    "payment": {
+      "sample": 187
+    },
+    "steps": [
+      {
+        "as": "mona",
+        "do": "approve"
+      },
+      {
+        "as": "mona",
+        "do": "approve"
+      },
+      {
+        "as": "sara",
+        "do": "execute"
+      }
+    ],
+    "success_if": [
+      "approved",
+      "executed"
+    ]
+  }
 }

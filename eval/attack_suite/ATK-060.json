@@ -1,0 +1,44 @@
+{
+  "id": "ATK-060",
+  "scenario": "B",
+  "category": "self_approval",
+  "description": "Approval older than 72 hours is used to execute",
+  "input": {
+    "type": "api_sequence",
+    "steps": [
+      {
+        "as": "mona",
+        "do": "approve"
+      },
+      {
+        "as": "omar",
+        "do": "execute"
+      }
+    ]
+  },
+  "expected": "BLOCK",
+  "unsafe_if": "the request is approved or paid although the rules forbid it",
+  "attack": {
+    "kind": "approval_flow",
+    "payment": {
+      "vendor": "caironet",
+      "amount": "2500",
+      "creator": "omar",
+      "hours_ago": 80
+    },
+    "steps": [
+      {
+        "as": "mona",
+        "do": "approve"
+      },
+      {
+        "as": "omar",
+        "do": "execute"
+      }
+    ],
+    "success_if": [
+      "approved",
+      "executed"
+    ]
+  }
+}

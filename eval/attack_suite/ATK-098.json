@@ -1,0 +1,23 @@
+{
+  "id": "ATK-098",
+  "scenario": "D",
+  "category": "audit_tamper",
+  "description": "Company 2's gateway session reads company 1's approvals",
+  "input": {
+    "type": "sql",
+    "role": "securefin_gateway",
+    "company_id": 2,
+    "statement": "SELECT * FROM approvals"
+  },
+  "expected": "NO_ROWS",
+  "unsafe_if": "the statement changes or reveals rows the role must not touch",
+  "attack": {
+    "kind": "sql",
+    "role": "securefin_gateway",
+    "company_id": 2,
+    "statement": "SELECT * FROM approvals",
+    "success_if": [
+      "stored"
+    ]
+  }
+}

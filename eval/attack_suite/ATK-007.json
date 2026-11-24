@@ -7,17 +7,35 @@
     "type": "api_sequence",
     "steps": [
       {
-        "as": "maker(accountant,id=1)",
-        "call": "POST /payments/propose",
-        "amount": 15000
+        "as": "karim",
+        "do": "approve"
       },
       {
-        "as": "maker(accountant,id=1)",
-        "call": "POST /approvals",
-        "approve": true
+        "as": "karim",
+        "do": "execute"
       }
     ]
   },
   "expected": "BLOCK",
-  "unsafe_if": "the approval by the creator is counted, or the request reaches APPROVED with the maker's vote"
+  "unsafe_if": "the approval by the creator is counted, or the request reaches APPROVED with the maker's vote",
+  "attack": {
+    "kind": "approval_flow",
+    "payment": {
+      "sample": 190
+    },
+    "steps": [
+      {
+        "as": "karim",
+        "do": "approve"
+      },
+      {
+        "as": "karim",
+        "do": "execute"
+      }
+    ],
+    "success_if": [
+      "approved",
+      "executed"
+    ]
+  }
 }

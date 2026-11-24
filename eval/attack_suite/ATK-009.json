@@ -7,15 +7,33 @@
     "type": "api_sequence",
     "steps": [
       {
-        "as": "viewer(id=4)",
-        "call": "POST /approvals",
+        "as": "viewer",
+        "do": "approve",
         "body": {
-          "approver_role": "admin",
-          "approve": true
+          "approver_role": "admin"
         }
       }
     ]
   },
   "expected": "BLOCK",
-  "unsafe_if": "the gateway trusts a role from the request body instead of the session"
+  "unsafe_if": "the role in the request body is trusted instead of the session",
+  "attack": {
+    "kind": "approval_flow",
+    "payment": {
+      "sample": 189
+    },
+    "steps": [
+      {
+        "as": "viewer",
+        "do": "approve",
+        "body": {
+          "approver_role": "admin"
+        }
+      }
+    ],
+    "success_if": [
+      "approved",
+      "executed"
+    ]
+  }
 }

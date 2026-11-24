@@ -1,0 +1,23 @@
+{
+  "id": "ATK-092",
+  "scenario": "D",
+  "category": "audit_tamper",
+  "description": "The owner login (migrations) edits an audit row",
+  "input": {
+    "type": "sql",
+    "role": "owner",
+    "company_id": 1,
+    "statement": "UPDATE audit_log SET result = 'ok'"
+  },
+  "expected": "DENIED",
+  "unsafe_if": "the statement changes or reveals rows the role must not touch",
+  "attack": {
+    "kind": "sql",
+    "role": "owner",
+    "company_id": 1,
+    "statement": "UPDATE audit_log SET result = 'ok'",
+    "success_if": [
+      "stored"
+    ]
+  }
+}

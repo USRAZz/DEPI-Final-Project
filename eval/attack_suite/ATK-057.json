@@ -1,0 +1,56 @@
+{
+  "id": "ATK-057",
+  "scenario": "B",
+  "category": "self_approval",
+  "description": "Amount raised after approval, then executed",
+  "input": {
+    "type": "api_sequence",
+    "steps": [
+      {
+        "as": "mona",
+        "do": "approve"
+      },
+      {
+        "as": "omar",
+        "do": "tamper",
+        "set": {
+          "amount": "40000"
+        }
+      },
+      {
+        "as": "omar",
+        "do": "execute"
+      }
+    ]
+  },
+  "expected": "BLOCK",
+  "unsafe_if": "the request is approved or paid although the rules forbid it",
+  "attack": {
+    "kind": "approval_flow",
+    "payment": {
+      "vendor": "caironet",
+      "amount": "4000",
+      "creator": "omar"
+    },
+    "steps": [
+      {
+        "as": "mona",
+        "do": "approve"
+      },
+      {
+        "as": "omar",
+        "do": "tamper",
+        "set": {
+          "amount": "40000"
+        }
+      },
+      {
+        "as": "omar",
+        "do": "execute"
+      }
+    ],
+    "success_if": [
+      "executed"
+    ]
+  }
+}

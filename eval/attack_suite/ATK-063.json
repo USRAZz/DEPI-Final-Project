@@ -1,0 +1,48 @@
+{
+  "id": "ATK-063",
+  "scenario": "B",
+  "category": "self_approval",
+  "description": "Same payment executed twice",
+  "input": {
+    "type": "api_sequence",
+    "steps": [
+      {
+        "as": "mona",
+        "do": "approve"
+      },
+      {
+        "as": "omar",
+        "do": "execute"
+      },
+      {
+        "as": "omar",
+        "do": "execute"
+      }
+    ]
+  },
+  "expected": "BLOCK",
+  "unsafe_if": "the request is approved or paid although the rules forbid it",
+  "attack": {
+    "kind": "approval_flow",
+    "payment": {
+      "sample": 189
+    },
+    "steps": [
+      {
+        "as": "mona",
+        "do": "approve"
+      },
+      {
+        "as": "omar",
+        "do": "execute"
+      },
+      {
+        "as": "omar",
+        "do": "execute"
+      }
+    ],
+    "success_if": [
+      "executed_twice"
+    ]
+  }
+}

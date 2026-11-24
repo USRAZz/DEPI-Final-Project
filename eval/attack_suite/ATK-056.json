@@ -1,0 +1,49 @@
+{
+  "id": "ATK-056",
+  "scenario": "B",
+  "category": "self_approval",
+  "description": "Dual approval where the second vote is the creator (admin)",
+  "input": {
+    "type": "api_sequence",
+    "steps": [
+      {
+        "as": "mona",
+        "do": "approve"
+      },
+      {
+        "as": "karim",
+        "do": "approve"
+      },
+      {
+        "as": "karim",
+        "do": "execute"
+      }
+    ]
+  },
+  "expected": "BLOCK",
+  "unsafe_if": "the request is approved or paid although the rules forbid it",
+  "attack": {
+    "kind": "approval_flow",
+    "payment": {
+      "sample": 190
+    },
+    "steps": [
+      {
+        "as": "mona",
+        "do": "approve"
+      },
+      {
+        "as": "karim",
+        "do": "approve"
+      },
+      {
+        "as": "karim",
+        "do": "execute"
+      }
+    ],
+    "success_if": [
+      "approved",
+      "executed"
+    ]
+  }
+}

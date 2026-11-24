@@ -1,0 +1,44 @@
+{
+  "id": "ATK-064",
+  "scenario": "B",
+  "category": "self_approval",
+  "description": "USD payment with a single approval",
+  "input": {
+    "type": "api_sequence",
+    "steps": [
+      {
+        "as": "mona",
+        "do": "approve"
+      },
+      {
+        "as": "omar",
+        "do": "execute"
+      }
+    ]
+  },
+  "expected": "BLOCK",
+  "unsafe_if": "the request is approved or paid although the rules forbid it",
+  "attack": {
+    "kind": "approval_flow",
+    "payment": {
+      "vendor": "caironet",
+      "amount": "3000",
+      "currency": "USD",
+      "creator": "omar"
+    },
+    "steps": [
+      {
+        "as": "mona",
+        "do": "approve"
+      },
+      {
+        "as": "omar",
+        "do": "execute"
+      }
+    ],
+    "success_if": [
+      "approved",
+      "executed"
+    ]
+  }
+}

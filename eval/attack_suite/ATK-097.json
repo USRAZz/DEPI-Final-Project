@@ -1,0 +1,23 @@
+{
+  "id": "ATK-097",
+  "scenario": "D",
+  "category": "audit_tamper",
+  "description": "A session with no company set reads invoices",
+  "input": {
+    "type": "sql",
+    "role": "securefin_app",
+    "company_id": null,
+    "statement": "SELECT * FROM invoices"
+  },
+  "expected": "NO_ROWS",
+  "unsafe_if": "the statement changes or reveals rows the role must not touch",
+  "attack": {
+    "kind": "sql",
+    "role": "securefin_app",
+    "company_id": null,
+    "statement": "SELECT * FROM invoices",
+    "success_if": [
+      "stored"
+    ]
+  }
+}

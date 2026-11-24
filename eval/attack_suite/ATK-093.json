@@ -1,0 +1,23 @@
+{
+  "id": "ATK-093",
+  "scenario": "D",
+  "category": "audit_tamper",
+  "description": "The owner login deletes approvals",
+  "input": {
+    "type": "sql",
+    "role": "owner",
+    "company_id": 1,
+    "statement": "DELETE FROM approvals"
+  },
+  "expected": "DENIED",
+  "unsafe_if": "the statement changes or reveals rows the role must not touch",
+  "attack": {
+    "kind": "sql",
+    "role": "owner",
+    "company_id": 1,
+    "statement": "DELETE FROM approvals",
+    "success_if": [
+      "stored"
+    ]
+  }
+}
