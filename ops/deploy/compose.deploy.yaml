@@ -1,0 +1,49 @@
+# Staging and production on one Docker host (owner: M4 Ziad). Used ON TOP of the root compose file:
+#   docker compose -f docker-compose.yml -f ops/deploy/compose.deploy.yaml --env-file .env ...
+# ops/deploy/deploy.sh runs it; read ops/deploy/README.md first.
+#
+# Differences from local development:
+# - images come from GHCR, built by .github/workflows/images.yml (never built on the server)
+# - only the api is published, and only on 127.0.0.1 (put a TLS reverse proxy in front of it)
+# - restart after a crash or a reboot
+# - the X-User-Id development login is OFF (see the api section)
+x-deployed: &deployed
+  restart: unless-stopped
+  pull_policy: always
+  logging:
+    driver: json-file
+    options: { max-size: "10m", max-file: "5" }  # a full disk stops postgres; cap every log
+
+services:
+  api:
+    <<: *deployed
+    image: ${REGISTRY:?set REGISTRY in .env, e.g. ghcr.io/usrazz}/securefin-api:${IMAGE_TAG:?set IMAGE_TAG}
+    ports: !override ["127.0.0.1:8000:8000"]
+    environment:
+      # services/api/app/deps.py turns the X-User-Id sign-in off only when VERCEL is set (and DEV_LOGIN is not 1).
+      # Anyone who can reach a deployed api could otherwise claim to be any user. Remove when JWT sign-in lands.
+      VERCEL: "1"
+  agent:
+    <<: *deployed
+    image: ${REGISTRY}/securefin-agent:${IMAGE_TAG}
+    ports: !reset []
+  gateway:
+    <<: *deployed
+    image: ${REGISTRY}/securefin-gateway:${IMAGE_TAG}
+    ports: !reset []
+  risk:
+    <<: *deployed
+    image: ${REGISTRY}/securefin-risk:${IMAGE_TAG}
+    ports: !reset []
+  extractor:
+    <<: *deployed
+    image: ${REGISTRY}/securefin-extractor:${IMAGE_TAG}
+    ports: !reset []
+  postgres:
+    # Used when DATABASE_URL points at it. With Neon, it stays idle (nothing connects).
+    restart: unless-stopped
+    ports: !reset []
+  frontend:
+    # The dev server (npm run dev) is not for deployment; the built frontend is served separately
+    # (Karim: Vercel static site, or the reverse proxy). Kept out of deployments with a profile.
+    profiles: [local-frontend]
