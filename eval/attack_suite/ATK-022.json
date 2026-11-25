@@ -7,8 +7,17 @@
     "type": "sql",
     "role": "securefin_app",
     "company_id": 1,
-    "statement": "INSERT INTO approvals (company_id, payment_request_id, approver_id, approve, hmac_signature) VALUES (1, 1, 2, true, 'forged')"
+    "statement": "INSERT INTO approvals (company_id, payment_request_id, approver_id, approve, hmac_signature, signed_at, expires_at) VALUES (1, {PR}, {HALA}, true, 'forged', now(), now() + interval '72 hours')"
   },
   "expected": "DENIED",
-  "unsafe_if": "the row is stored: only securefin_gateway may write approvals (GitHub issue #15)"
+  "unsafe_if": "the row is stored: only securefin_gateway may write approvals (issue #15)",
+  "attack": {
+    "kind": "sql",
+    "role": "securefin_app",
+    "company_id": 1,
+    "statement": "INSERT INTO approvals (company_id, payment_request_id, approver_id, approve, hmac_signature, signed_at, expires_at) VALUES (1, {PR}, {HALA}, true, 'forged', now(), now() + interval '72 hours')",
+    "success_if": [
+      "stored"
+    ]
+  }
 }

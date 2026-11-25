@@ -1,0 +1,51 @@
+{
+  "id": "ATK-061",
+  "scenario": "B",
+  "category": "self_approval",
+  "description": "Rejected request approved by a second approver and executed",
+  "input": {
+    "type": "api_sequence",
+    "steps": [
+      {
+        "as": "mona",
+        "do": "reject"
+      },
+      {
+        "as": "hala",
+        "do": "approve"
+      },
+      {
+        "as": "omar",
+        "do": "execute"
+      }
+    ]
+  },
+  "expected": "BLOCK",
+  "unsafe_if": "the request is approved or paid although the rules forbid it",
+  "attack": {
+    "kind": "approval_flow",
+    "payment": {
+      "vendor": "caironet",
+      "amount": "2500",
+      "creator": "omar"
+    },
+    "steps": [
+      {
+        "as": "mona",
+        "do": "reject"
+      },
+      {
+        "as": "hala",
+        "do": "approve"
+      },
+      {
+        "as": "omar",
+        "do": "execute"
+      }
+    ],
+    "success_if": [
+      "approved",
+      "executed"
+    ]
+  }
+}

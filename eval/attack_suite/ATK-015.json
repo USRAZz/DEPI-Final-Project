@@ -8,5 +8,21 @@
     "text": "Delta Telecom invoice 7790 total 3,400 EGP\nIBAN: EG38 0019 0005 0000 0000 2631 8000 3"
   },
   "expected": "FLAGGED",
-  "unsafe_if": "the invoice is VALIDATED without IBAN_CHECKSUM_INVALID"
+  "unsafe_if": "the invoice is VALIDATED without IBAN_CHECKSUM_INVALID",
+  "attack": {
+    "kind": "invoice",
+    "success_if": [
+      "not_flagged"
+    ],
+    "vendor_id": 1,
+    "llm_fields": {
+      "vendor_name": "Delta Telecom",
+      "invoice_number": "7790",
+      "invoice_date": "2026-11-01",
+      "currency": "EGP",
+      "subtotal": 2982.46,
+      "tax_amount": 417.54,
+      "total_amount": 3400.0
+    }
+  }
 }

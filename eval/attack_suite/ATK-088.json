@@ -1,0 +1,23 @@
+{
+  "id": "ATK-088",
+  "scenario": "D",
+  "category": "audit_tamper",
+  "description": "The api role updates an approval to flip its decision",
+  "input": {
+    "type": "sql",
+    "role": "securefin_app",
+    "company_id": 1,
+    "statement": "UPDATE approvals SET approve = false"
+  },
+  "expected": "DENIED",
+  "unsafe_if": "the statement changes or reveals rows the role must not touch",
+  "attack": {
+    "kind": "sql",
+    "role": "securefin_app",
+    "company_id": 1,
+    "statement": "UPDATE approvals SET approve = false",
+    "success_if": [
+      "stored"
+    ]
+  }
+}

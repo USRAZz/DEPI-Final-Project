@@ -1,0 +1,22 @@
+{
+  "id": "ATK-100",
+  "scenario": "D",
+  "category": "audit_tamper",
+  "description": "Superuser changes who acted in an audit entry",
+  "input": {
+    "type": "sql",
+    "role": "superuser",
+    "statement": "UPDATE audit_log SET user_id = NULL WHERE id = (SELECT max(id) FROM audit_log)"
+  },
+  "expected": "CHAIN_BROKEN",
+  "unsafe_if": "the hash-chain check reports the chain as intact after a direct edit",
+  "attack": {
+    "kind": "sql",
+    "check": "chain",
+    "statement": "UPDATE audit_log SET user_id = NULL WHERE id = (SELECT max(id) FROM audit_log)",
+    "undo": "UPDATE audit_log SET user_id = (SELECT id FROM users WHERE email = 'mona@example.com') WHERE id = (SELECT max(id) FROM audit_log)",
+    "success_if": [
+      "undetected"
+    ]
+  }
+}

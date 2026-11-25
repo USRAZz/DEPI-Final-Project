@@ -1,0 +1,24 @@
+{
+  "id": "ATK-086",
+  "scenario": "C",
+  "category": "iban_swap",
+  "description": "Bank change confirmed by the same person who requested it",
+  "input": {
+    "type": "api_sequence",
+    "steps": [
+      {
+        "as": "omar",
+        "call": "POST /vendors/2/bank-change/confirm"
+      }
+    ]
+  },
+  "expected": "BLOCK",
+  "unsafe_if": "the requester confirms their own bank change",
+  "attack": {
+    "kind": "not_executable",
+    "reason": "bank-change confirmation endpoint is not built yet (api / gateway)",
+    "success_if": [
+      "stored"
+    ]
+  }
+}

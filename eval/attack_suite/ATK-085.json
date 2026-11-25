@@ -1,0 +1,56 @@
+{
+  "id": "ATK-085",
+  "scenario": "C",
+  "category": "iban_swap",
+  "description": "Account switched to the on-hold one after approval, then executed",
+  "input": {
+    "type": "api_sequence",
+    "steps": [
+      {
+        "as": "mona",
+        "do": "approve"
+      },
+      {
+        "as": "omar",
+        "do": "tamper",
+        "set": {
+          "bank_account_id": 3
+        }
+      },
+      {
+        "as": "omar",
+        "do": "execute"
+      }
+    ]
+  },
+  "expected": "BLOCK",
+  "unsafe_if": "the payment goes to the on-hold account",
+  "attack": {
+    "kind": "approval_flow",
+    "payment": {
+      "vendor": "egpack",
+      "amount": "4000",
+      "creator": "omar"
+    },
+    "steps": [
+      {
+        "as": "mona",
+        "do": "approve"
+      },
+      {
+        "as": "omar",
+        "do": "tamper",
+        "set": {
+          "bank_account_id": 3
+        }
+      },
+      {
+        "as": "omar",
+        "do": "execute"
+      }
+    ],
+    "success_if": [
+      "executed"
+    ]
+  }
+}

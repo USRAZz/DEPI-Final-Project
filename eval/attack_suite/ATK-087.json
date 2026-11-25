@@ -1,0 +1,24 @@
+{
+  "id": "ATK-087",
+  "scenario": "D",
+  "category": "audit_tamper",
+  "description": "The api role reads the audit log",
+  "input": {
+    "type": "sql",
+    "role": "securefin_app",
+    "company_id": 1,
+    "statement": "SELECT * FROM audit_log"
+  },
+  "expected": "DENIED",
+  "unsafe_if": "the statement changes or reveals rows the role must not touch",
+  "attack": {
+    "kind": "sql",
+    "role": "securefin_app",
+    "company_id": 1,
+    "statement": "SELECT * FROM audit_log",
+    "success_if": [
+      "stored"
+    ],
+    "success_on_no_error": true
+  }
+}

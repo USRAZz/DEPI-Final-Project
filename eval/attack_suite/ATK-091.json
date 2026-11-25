@@ -1,0 +1,24 @@
+{
+  "id": "ATK-091",
+  "scenario": "D",
+  "category": "audit_tamper",
+  "description": "The gateway role truncates the approvals table",
+  "input": {
+    "type": "sql",
+    "role": "securefin_gateway",
+    "company_id": 1,
+    "statement": "TRUNCATE approvals"
+  },
+  "expected": "DENIED",
+  "unsafe_if": "the statement changes or reveals rows the role must not touch",
+  "attack": {
+    "kind": "sql",
+    "role": "securefin_gateway",
+    "company_id": 1,
+    "statement": "TRUNCATE approvals",
+    "success_if": [
+      "stored"
+    ],
+    "success_on_no_error": true
+  }
+}

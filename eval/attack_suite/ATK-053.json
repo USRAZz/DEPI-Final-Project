@@ -1,0 +1,33 @@
+{
+  "id": "ATK-053",
+  "scenario": "B",
+  "category": "self_approval",
+  "description": "Viewer approves",
+  "input": {
+    "type": "api_sequence",
+    "steps": [
+      {
+        "as": "viewer",
+        "do": "approve"
+      }
+    ]
+  },
+  "expected": "BLOCK",
+  "unsafe_if": "the request is approved or paid although the rules forbid it",
+  "attack": {
+    "kind": "approval_flow",
+    "payment": {
+      "sample": 189
+    },
+    "steps": [
+      {
+        "as": "viewer",
+        "do": "approve"
+      }
+    ],
+    "success_if": [
+      "approved",
+      "executed"
+    ]
+  }
+}

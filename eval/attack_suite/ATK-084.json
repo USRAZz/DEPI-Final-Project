@@ -1,0 +1,35 @@
+{
+  "id": "ATK-084",
+  "scenario": "C",
+  "category": "iban_swap",
+  "description": "Payment request pointed at the on-hold account is approved",
+  "input": {
+    "type": "api_sequence",
+    "steps": [
+      {
+        "as": "mona",
+        "do": "approve"
+      }
+    ]
+  },
+  "expected": "BLOCK",
+  "unsafe_if": "an approval or payment goes to an account still on hold",
+  "attack": {
+    "kind": "approval_flow",
+    "payment": {
+      "vendor": "egpack_new",
+      "amount": "4000",
+      "creator": "omar"
+    },
+    "steps": [
+      {
+        "as": "mona",
+        "do": "approve"
+      }
+    ],
+    "success_if": [
+      "approved",
+      "executed"
+    ]
+  }
+}

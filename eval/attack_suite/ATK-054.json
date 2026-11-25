@@ -1,0 +1,33 @@
+{
+  "id": "ATK-054",
+  "scenario": "B",
+  "category": "self_approval",
+  "description": "Execute with no approval at all",
+  "input": {
+    "type": "api_sequence",
+    "steps": [
+      {
+        "as": "omar",
+        "do": "execute"
+      }
+    ]
+  },
+  "expected": "BLOCK",
+  "unsafe_if": "the request is approved or paid although the rules forbid it",
+  "attack": {
+    "kind": "approval_flow",
+    "payment": {
+      "sample": 189
+    },
+    "steps": [
+      {
+        "as": "omar",
+        "do": "execute"
+      }
+    ],
+    "success_if": [
+      "approved",
+      "executed"
+    ]
+  }
+}

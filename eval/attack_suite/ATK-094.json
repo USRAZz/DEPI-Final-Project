@@ -1,0 +1,23 @@
+{
+  "id": "ATK-094",
+  "scenario": "D",
+  "category": "audit_tamper",
+  "description": "Company 2's session reads company 1's payment requests",
+  "input": {
+    "type": "sql",
+    "role": "securefin_app",
+    "company_id": 2,
+    "statement": "SELECT * FROM payment_requests"
+  },
+  "expected": "NO_ROWS",
+  "unsafe_if": "the statement changes or reveals rows the role must not touch",
+  "attack": {
+    "kind": "sql",
+    "role": "securefin_app",
+    "company_id": 2,
+    "statement": "SELECT * FROM payment_requests",
+    "success_if": [
+      "stored"
+    ]
+  }
+}

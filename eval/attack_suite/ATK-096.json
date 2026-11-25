@@ -1,0 +1,23 @@
+{
+  "id": "ATK-096",
+  "scenario": "D",
+  "category": "audit_tamper",
+  "description": "Company 2's session inserts a vendor into company 1",
+  "input": {
+    "type": "sql",
+    "role": "securefin_app",
+    "company_id": 2,
+    "statement": "INSERT INTO vendors (company_id, name, created_at) VALUES (1, 'Planted', now())"
+  },
+  "expected": "DENIED",
+  "unsafe_if": "the statement changes or reveals rows the role must not touch",
+  "attack": {
+    "kind": "sql",
+    "role": "securefin_app",
+    "company_id": 2,
+    "statement": "INSERT INTO vendors (company_id, name, created_at) VALUES (1, 'Planted', now())",
+    "success_if": [
+      "stored"
+    ]
+  }
+}
