@@ -14,6 +14,8 @@ import check_health  # noqa: E402
 def _stub(status: int, body: dict):
     class Handler(BaseHTTPRequestHandler):
         def _answer(self):
+            # read the request body first: on Windows an unread body makes close() reset the socket (WinError 10053)
+            self.rfile.read(int(self.headers.get("Content-Length") or 0))
             self.send_response(status)
             self.send_header("Content-Type", "application/json")
             self.end_headers()
