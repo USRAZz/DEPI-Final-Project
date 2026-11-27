@@ -83,3 +83,10 @@ The HTTP endpoints and the `approvals` table are added in the next PR.
   n8n integrity run calls it (`n8n/README.md`).
 - Known shortcut: an approval row and its audit entry are written in two transactions.
 - Tests: `tests/test_audit_log.py`; `tests/test_db_store_audit.py` needs `TEST_DATABASE_URL` (CI job `migrations-postgres`).
+
+## Security
+
+- **Service token:** `/v1/authorize`, `/v1/approvals/{id}` and `/v1/execute-check` require the header `X-Service-Token` with the value of env `GATEWAY_SERVICE_TOKEN` (at least 32 characters, never in Git). Wrong or missing token: **401**. Token not configured on the gateway: **503** (everything is refused). `/health` needs no token. `/v1/audit/verify` keeps its own, separate `AUDIT_VERIFY_TOKEN` (read-only secret for the nightly run).
+- **Fail closed:** an unexpected error in `/v1/authorize` returns `BLOCK`; in `/v1/execute-check` it returns `allowed: false`; in `/v1/approvals` it returns 503 (nothing approved). An audit entry that cannot be written also blocks authorize and execute-check: a decision nobody can see is not allowed.
+- **Replay protection:** `request_id` must be unique per request (use a UUID). Same `request_id` and payload returns the first decision again (safe retry); same `request_id` with a different payload returns **409**. Scope: company + user + `request_id`, kept 24 h, in memory (per gateway instance).
+- **Audit:** every `/v1/authorize` decision is written to the audit log (`action: authorize`); the response carries `audit_entry_id`. Free-text tool parameters are never copied into the log. Approval and execute-check entries go into the **payment's real company chain**, not the company the caller claims (the claim is kept in `parameters.claimed_company_id`).
