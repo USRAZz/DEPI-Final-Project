@@ -1,8 +1,9 @@
 import hmac
+import logging
 import os
 from datetime import UTC, datetime
 
-from fastapi import FastAPI, Header, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException
 from pydantic import BaseModel, Field, ValidationError
 from securefin_contracts import (
     ApprovalRequest,
@@ -20,9 +21,11 @@ from securefin_contracts.actions import CreatePaymentParams
 from .approvals import ApprovalDenied, ApprovalKeyError, execute_check, load_hmac_key, submit_approval
 from .audit_log import InMemoryAuditLog, PostgresAuditLog, first_broken
 from .db import build_engine
+from .idempotency import IdempotencyCache, RequestIdConflictError
 from .payments_client import PaymentNotFoundError, PaymentsUnavailableError, build_payments_client
 from .policy import BASE_CURRENCY, get_policy
 from .risk_client import RiskUnavailableError, build_risk_client
+from .security import require_service_token
 from .stores import DuplicateApprovalError, InMemoryApprovalStore, PostgresApprovalStore
 
 app = FastAPI(title="SecureFin Security Gateway")
@@ -35,6 +38,8 @@ ENGINE = build_engine()
 APPROVAL_STORE = (PostgresApprovalStore(ENGINE, POLICY.defaults.approvals.approval_expiry_hours) if ENGINE
                   else InMemoryApprovalStore())
 AUDIT_LOG = PostgresAuditLog(ENGINE) if ENGINE else InMemoryAuditLog()
+IDEMPOTENCY = IdempotencyCache()
+log = logging.getLogger("gateway")
 
 
 def _audit(action: str, company_id: int | None, user_id: int | None, decision: str, result: str,
@@ -48,13 +53,20 @@ def _audit(action: str, company_id: int | None, user_id: int | None, decision: s
                                 tool_call=action))
 
 
+def _audit_best_effort(*args) -> None:
+    """For paths that already refuse the request: a failing audit write must not hide the refusal."""
+    try:
+        _audit(*args)
+    except Exception:
+        log.exception("audit write failed on a refusal path")
+
+
 @app.get("/health")
 def health():
     return {"service": "gateway", "status": "ok"}
 
 
-@app.post("/v1/authorize", response_model=GatewayDecision)
-def authorize(req: AuthorizeRequest) -> GatewayDecision:
+def _decide(req: AuthorizeRequest) -> GatewayDecision:
     passed: list[str] = []
     # 1. Identity & role allowlist
     if req.action.tool not in POLICY.tools_for(req.role):
@@ -93,6 +105,43 @@ def authorize(req: AuthorizeRequest) -> GatewayDecision:
     return GatewayDecision(decision=Decision.ALLOW, checks_passed=passed)
 
 
+def _authorize_params(req: AuthorizeRequest) -> dict:
+    """What the audit log records about a request. Free-text tool parameters are never copied (PII risk)."""
+    params: dict = {"tool": req.action.tool.value, "request_id": req.request_id, "role": req.role.value}
+    if req.action.tool == ToolName.CREATE_PAYMENT_REQUEST:
+        try:
+            p = CreatePaymentParams.model_validate(req.action.params)
+            params.update(invoice_id=p.invoice_id, vendor_id=p.vendor_id, amount=str(p.amount), currency=p.currency)
+        except ValidationError:
+            params["param_keys"] = sorted(req.action.params)
+    return params
+
+
+@app.post("/v1/authorize", response_model=GatewayDecision, dependencies=[Depends(require_service_token)])
+def authorize(req: AuthorizeRequest) -> GatewayDecision:
+    """Same request_id and payload returns the first decision; a different payload is a conflict (409).
+
+    Fail closed: a crash blocks the action, and so does an audit log that cannot be written."""
+    try:
+        cached = IDEMPOTENCY.get(req)
+    except RequestIdConflictError:
+        raise HTTPException(status_code=409, detail=["request_id was already used with a different request"]) from None
+    if cached is not None:
+        return cached
+    try:
+        decision = _decide(req)
+        entry = AUDIT_LOG.append(AuditEvent(
+            user_id=req.user_id, company_id=req.company_id, action="authorize", tool_call=req.action.tool.value,
+            decision=decision.decision.value, result="; ".join(decision.reasons)[:500] or "ok",
+            risk_level=None, parameters=_authorize_params(req), source_service="gateway"))
+    except Exception:
+        log.exception("authorize failed")
+        return GatewayDecision(decision=Decision.BLOCK, reasons=["gateway error: action blocked"])
+    decision = decision.model_copy(update={"audit_entry_id": entry.id})
+    IDEMPOTENCY.put(req, decision)
+    return decision
+
+
 def _load_payment(payment_request_id: int):
     try:
         return PAYMENTS_CLIENT.get(payment_request_id)
@@ -109,26 +158,38 @@ def _signing_key() -> bytes:
         raise HTTPException(status_code=503, detail=["approval signing unavailable: nothing approved"]) from None
 
 
-@app.post("/v1/approvals/{payment_request_id}", response_model=ApprovalResult)
+@app.post("/v1/approvals/{payment_request_id}", response_model=ApprovalResult,
+          dependencies=[Depends(require_service_token)])
 def approve(payment_request_id: int, req: ApprovalRequest) -> ApprovalResult:
     params = {"payment_request_id": payment_request_id, "approve": req.approve}
+    # The entry goes into the payment's real company chain (not the company the caller claims), so a wrong or
+    # forged company cannot fill another tenant's log. The claim is recorded in the parameters.
+    ctx: dict = {"company_id": req.company_id}
+    if req.company_id is not None:
+        params["claimed_company_id"] = req.company_id
     try:
-        result = _approve(payment_request_id, req)
+        result = _approve(payment_request_id, req, ctx)
     except HTTPException as e:
-        _audit("approval", req.company_id, req.approver_id, "BLOCK", f"{e.status_code}: {'; '.join(e.detail)}", params)
+        _audit_best_effort("approval", ctx["company_id"], req.approver_id, "BLOCK",
+                           f"{e.status_code}: {'; '.join(e.detail)}", params)
         raise
+    except Exception:
+        log.exception("approval failed")
+        _audit_best_effort("approval", ctx["company_id"], req.approver_id, "BLOCK", "503: gateway error", params)
+        raise HTTPException(status_code=503, detail=["gateway error: nothing approved"]) from None
     # shortcut: the approval row and its audit entry are two transactions; an audit failure after a stored
     # approval returns 500 and leaves the approval without an entry. One shared transaction fixes it.
-    _audit("approval", req.company_id, req.approver_id, result.status.value,
+    _audit("approval", ctx["company_id"], req.approver_id, result.status.value,
            "; ".join(result.reasons) or f"{result.approvals_received}/{result.approvals_required} approvals", params)
     return result
 
 
-def _approve(payment_request_id: int, req: ApprovalRequest) -> ApprovalResult:
+def _approve(payment_request_id: int, req: ApprovalRequest, ctx: dict) -> ApprovalResult:
     if req.payment_request_id != payment_request_id:
         raise HTTPException(status_code=422, detail=["payment request id in path and body differ"])
     key = _signing_key()
     payment = _load_payment(payment_request_id)
+    ctx["company_id"] = payment.company_id
     existing = APPROVAL_STORE.list(payment_request_id, company_id=payment.company_id)
     try:
         result, record = submit_approval(req, payment, existing, POLICY, key, datetime.now(UTC))
@@ -142,21 +203,26 @@ def _approve(payment_request_id: int, req: ApprovalRequest) -> ApprovalResult:
     return result
 
 
-@app.post("/v1/execute-check", response_model=ExecuteCheckResult)
+@app.post("/v1/execute-check", response_model=ExecuteCheckResult, dependencies=[Depends(require_service_token)])
 def execute_check_endpoint(req: ExecuteCheckRequest) -> ExecuteCheckResult:
     """The api calls this right before executing a payment. Anything but allowed=true means do not pay."""
-    params = {"payment_request_id": req.payment_request_id}
+    params = {"payment_request_id": req.payment_request_id, "claimed_company_id": req.company_id}
+    company_id: int | None = req.company_id
     try:
         key = _signing_key()
         payment = _load_payment(req.payment_request_id)
+        company_id = payment.company_id          # audit into the payment's real company chain
+        result = execute_check(req, payment, APPROVAL_STORE.list(req.payment_request_id, company_id=company_id),
+                               POLICY, key, datetime.now(UTC))
+        _audit("execute_check", company_id, req.requested_by, "ALLOW" if result.allowed else "BLOCK",
+               "; ".join(result.reasons) or "allowed", params)
     except HTTPException as e:
-        _audit("execute_check", req.company_id, req.requested_by, "BLOCK", f"{e.status_code}: {'; '.join(e.detail)}",
-               params)
+        _audit_best_effort("execute_check", company_id, req.requested_by, "BLOCK",
+                           f"{e.status_code}: {'; '.join(e.detail)}", params)
         raise
-    result = execute_check(req, payment, APPROVAL_STORE.list(req.payment_request_id, company_id=payment.company_id),
-                           POLICY, key, datetime.now(UTC))
-    _audit("execute_check", req.company_id, req.requested_by, "ALLOW" if result.allowed else "BLOCK",
-           "; ".join(result.reasons) or "allowed", params)
+    except Exception:  # fail closed: a crash (database down, audit not writable) must never read as "allowed"
+        log.exception("execute-check failed")
+        return ExecuteCheckResult(allowed=False, reasons=["gateway error: do not execute"])
     return result
 
 
