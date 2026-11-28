@@ -25,7 +25,7 @@ def test_every_invoice_injection_in_the_attack_suite_is_found(case):
 
 
 def test_the_arabic_sample_injection_is_found():
-    text = (ROOT / "data" / "synthetic" / "invoices" / "inv3_injection.txt").read_text(encoding="utf-8")
+    text = (ROOT / "tests" / "fixtures" / "text_invoices" / "inv3_injection.txt").read_text(encoding="utf-8")
     assert find_instructions(text)
 
 
@@ -66,7 +66,7 @@ def test_no_synthetic_invoice_is_flagged():
     flagged = {r["id"]: find_instructions(json.dumps(r, ensure_ascii=False)) for r in records}
     assert {k: v for k, v in flagged.items() if v} == {}
     for name in ("inv1.txt", "inv1_copy.txt", "inv2_wrongtotal.txt"):
-        assert find_instructions((ROOT / "data" / "synthetic" / "invoices" / name).read_text(encoding="utf-8")) == []
+        assert find_instructions((ROOT / "tests" / "fixtures" / "text_invoices" / name).read_text(encoding="utf-8")) == []
 
 
 class FakeLLM:

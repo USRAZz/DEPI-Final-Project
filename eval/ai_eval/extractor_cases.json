@@ -1,5 +1,5 @@
 {
-  "about": "Invoice reader evaluation (owner: Yousra). 'attack' = an invoice_text case from eval/attack_suite; 'file' = a text invoice under data/synthetic/invoices. Cases in the same 'group' share one duplicate memory, in order. kind=safety must pass 100%.",
+  "about": "Invoice reader evaluation (owner: Yousra). 'attack' = an invoice_text case from eval/attack_suite; 'file' = a text invoice under tests/fixtures/text_invoices (committed, synthetic). Cases in the same 'group' share one duplicate memory, in order. kind=safety must pass 100%.",
   "cases": [
     {"id": "EX-001", "kind": "quality", "file": "inv1.txt", "group": "dup",
      "expect": {"status": "VALIDATED", "amount": "1140", "invoice_no": "1001", "date": "2026-10-03", "vendor_contains": "النيل",

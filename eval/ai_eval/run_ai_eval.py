@@ -32,7 +32,7 @@ from ai_core.privacy import find_ibans, normalize_digits  # noqa: E402
 
 HERE = pathlib.Path(__file__).resolve().parent
 ATTACKS = ROOT / "eval" / "attack_suite"
-INVOICES = ROOT / "data" / "synthetic" / "invoices"
+INVOICES = ROOT / "tests" / "fixtures" / "text_invoices"
 RESULTS = ROOT / "eval" / "results"
 
 _ARABIC = re.compile(r"[؀-ۿ]")

@@ -198,8 +198,10 @@ def test_chat_report_route_returns_the_markdown():
 @pytest.fixture
 def jev(monkeypatch):
     for k in ("LLM_ROUTING", "JEV_MODELS", "JEV_EXCLUDED_MODELS", "JEV_COST_TIER", "AGENT_MODEL", "AGENT_ROUTING",
-              "REPORT_EVALUATOR_JEV_COST_TIER", "JEV_FALLBACK_MODEL"):
+              "REPORT_EVALUATOR_JEV_COST_TIER", "JEV_FALLBACK_MODEL", "AGENT_PROVIDER", "LLM_FALLBACK_PROVIDERS"):
         monkeypatch.delenv(k, raising=False)
+    # Everything the tests need is set here: nothing may come from a developer's .env (CI has none).
+    monkeypatch.setenv("LLM_PROVIDER", "openrouter")
     monkeypatch.setenv("OPENROUTER_API_KEY", "test-key-not-used")
     monkeypatch.setenv("OPENROUTER_MODEL", "openai/gpt-4o-mini")
     monkeypatch.setenv("LLM_ROUTING", "jev")
