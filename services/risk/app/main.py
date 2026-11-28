@@ -27,11 +27,12 @@ def health():
 def score(req: RiskRequest) -> RiskScore:
     """Score the invoice's features; never return sensitive feature values.
 
-    Features sent in the request are used as given (tests, manual checks). Otherwise they are fetched
-    from the api by invoice_id; if that fails the answer is 503, which the gateway treats as
-    "risk unavailable" and holds the payment (never fails open).
+    Non-empty features sent in the request are used as given (tests, manual checks). Otherwise they are
+    fetched from the api by invoice_id; if that fails the answer is 503, which the gateway treats as
+    "risk unavailable" and holds the payment (never fails open). An empty `features` with an invoice_id
+    says nothing about the invoice, so it is fetched too rather than scored as 0.
     """
-    if "features" in req.model_fields_set or req.invoice_id is None:
+    if req.features or req.invoice_id is None:
         features = req.features
     else:
         try:

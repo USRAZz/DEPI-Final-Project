@@ -2,6 +2,7 @@ import os
 
 from fastapi import FastAPI
 
+from .assistant import router as assistant_router
 from .gateway import Gateway, build_gateway
 from .risk_features import internal_router
 from .routes import router
@@ -25,6 +26,7 @@ def create_app(store: DataStore | None = None, gateway: Gateway | None = None) -
     app.state.store = store or default_store()
     app.state.gateway = gateway or build_gateway()
     app.include_router(router)
+    app.include_router(assistant_router)
     app.include_router(internal_router)
     return app
 

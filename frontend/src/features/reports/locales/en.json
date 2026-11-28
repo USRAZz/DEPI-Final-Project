@@ -1,4 +1,18 @@
 {
   "title": "Reports",
-  "empty": "Nothing to show yet."
+  "subtitle": "Ask for a report in your own words; the numbers come straight from your data.",
+  "empty": "Write what you need, for example: Spending report for last month.",
+  "inputLabel": "Report request",
+  "placeholder": "Spending report for last month",
+  "generate": "Create report",
+  "working": "Writing the report…",
+  "error": "The report could not be created right now.",
+  "print": "Print / save as PDF",
+  "models": "Models used:",
+  "quality.passed": "Checked",
+  "quality.numbers_checked": "Numbers checked",
+  "quality.fallback": "Written from the data",
+  "suggest.month": "Spending report for last month",
+  "suggest.alerts": "Flagged invoices and top vendors this month",
+  "suggest.trend": "Monthly spending trend for the last 3 months"
 }

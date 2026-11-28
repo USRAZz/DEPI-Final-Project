@@ -2,7 +2,7 @@ from app.audit_chain import GENESIS, compute_hash, verify_chain
 from app.main import app
 from fastapi.testclient import TestClient
 
-client = TestClient(app)
+client = TestClient(app, headers={"X-Service-Token": "test-gateway-token"})  # see conftest.caller_token
 
 
 def _req(role, amount="500"):

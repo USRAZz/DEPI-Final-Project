@@ -1,8 +1,9 @@
 from decimal import Decimal
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from .common import RiskLevel
+from .common import Language, RiskLevel
 
 
 class RiskRequest(BaseModel):
@@ -39,3 +40,25 @@ class RiskScore(BaseModel):
     rule_hits: list[str] = Field(default_factory=list)
     shap_reasons: list[ShapReason] = Field(default_factory=list)
     model_version: str = "rules-v0"
+
+
+class ExplainRequest(BaseModel):
+    """POST /v1/explain on services/agent: put a RiskScore into words for the user."""
+
+    risk: RiskScore
+    language: Language = Language.EN
+
+
+class RiskReason(BaseModel):
+    code: str  # one of RiskScore.rule_hits, unchanged
+    text: str = Field(max_length=400)
+
+
+class RiskExplanation(BaseModel):
+    """One plain sentence on the overall level, then one per rule hit, in the same order as rule_hits.
+    source = "llm" when the model phrased it (checked against the codes), "template" for the fixed wording."""
+
+    summary: str = Field(max_length=600)
+    reasons: list[RiskReason] = Field(default_factory=list)
+    language: Language
+    source: Literal["llm", "template"]

@@ -48,6 +48,10 @@ class MockBackend:
         {"id": 4, "vendor_id": 3, "vendor_name": "Cairo Cloud Hosting", "invoice_number": "CH-55",
          "invoice_date": "2026-09-28", "total_amount": 48000.0, "currency": "EGP", "status": "READY",
          "category": "software"},
+        # Flagged by the invoice reader (subtotal + tax != total), not by a duplicate: a second kind of alert.
+        {"id": 5, "vendor_id": 4, "vendor_name": "Giza Print House", "invoice_number": "GP-310",
+         "invoice_date": "2026-09-15", "total_amount": 7800.0, "currency": "EGP", "status": "FLAGGED",
+         "category": "marketing", "extraction_issues": ["TOTAL_MISMATCH"]},
     ]
     TRANSACTIONS = [
         {"date": "2026-10-05", "invoice_id": 1, "amount": 12500.0, "status": "paid"},
@@ -55,7 +59,9 @@ class MockBackend:
     ]
     # Same scale as the risk service: score 0-100.
     RISK = {3: {"score": 70, "level": "high", "rule_hits": ["DUPLICATE_INVOICE"],
-                "reasons": ["Same vendor and invoice number as invoice 1"]}}
+                "reasons": ["Same vendor and invoice number as invoice 1"]},
+            5: {"score": 40, "level": "medium", "rule_hits": ["INVOICE_TOTAL_MISMATCH"],
+                "reasons": ["Subtotal plus tax is not equal to the total"]}}
 
     def get_invoices(self, ctx: Context, filters: dict):
         return _filter(self.INVOICES, "invoice_date", filters)
@@ -68,20 +74,33 @@ class MockBackend:
 
 
 class ApiBackend:
-    """Calls the real API with the user's token. TODO: align PATHS with Karim's real endpoints."""
-    PATHS = {"invoices": "/invoices", "transactions": "/transactions", "risk": "/risk/{invoice_id}"}
+    """Calls services/api with the user's own identity (services/api/app/assistant.py)."""
+    PATHS = {"invoices": "/invoices", "transactions": "/transactions", "risk": "/invoices/{invoice_id}/risk"}
+    MAX_ROWS = 200  # the api's limit per call
 
-    def __init__(self, base_url: str | None = None):
-        self.base = (base_url or os.getenv("API_BASE_URL", "http://localhost:8000")).rstrip("/")
+    def __init__(self, base_url: str | None = None, transport=None):
+        self.base = (base_url or os.getenv("API_BASE_URL") or os.getenv("API_URL") or "http://localhost:8000").rstrip("/")
+        self.transport = transport
 
     def _get(self, ctx: Context, path: str, params: dict | None = None):
         import httpx
+        params = {k: v for k, v in (params or {}).items() if v not in (None, "")}
+        # The user's own identity, never a service account: the api applies that user's role and company.
+        # Bearer = the JWT once the api has it; X-User-Id = the api's current development login.
         headers = {"Authorization": f"Bearer {ctx.token}"} if ctx.token else {}
-        r = httpx.get(self.base + path, params=params, headers=headers, timeout=15)
+        if ctx.user_id and ctx.user_id != Context.user_id:
+            headers["X-User-Id"] = str(ctx.user_id)
+        with httpx.Client(transport=self.transport, timeout=15) as client:
+            r = client.get(self.base + path, params=params, headers=headers)
         r.raise_for_status()
         return r.json()
 
     def get_invoices(self, ctx, filters):
+        filters = dict(filters)
+        try:
+            filters["limit"] = min(int(filters.get("limit") or 50), self.MAX_ROWS)
+        except (TypeError, ValueError):
+            filters["limit"] = 50
         return self._get(ctx, self.PATHS["invoices"], filters)
 
     def get_transactions(self, ctx, date_from=None, date_to=None):
@@ -172,10 +191,12 @@ class Tool:
 
 class ToolRegistry:
     def __init__(self, backend=None):
-        b = backend or get_backend()
+        b = self.backend = backend or get_backend()
+        self.calls: list[tuple[str, dict, Any]] = []  # (tool, args, result) of this request, for alerts and sources
         self._tools: dict[str, Tool] = {}
         self.add("get_invoices", "List invoices of the company, newest first.",
-                 {"vendor_name": "optional text", "status": "optional: READY | FLAGGED | FAILED",
+                 {"vendor_name": "optional text",
+                  "status": "optional: FLAGGED | VALIDATED | NEEDS-REVIEW | PENDING_APPROVAL | PAID_SIMULATED | READY",
                   "date_from": "optional YYYY-MM-DD", "date_to": "optional YYYY-MM-DD", "limit": "optional max rows"},
                  lambda ctx, **f: b.get_invoices(ctx, f))
         self.add("get_transactions", "List payments made in a date range.",
@@ -205,4 +226,6 @@ class ToolRegistry:
     def call(self, name: str, args: dict | None, ctx: Context):
         if name not in self._tools:
             raise KeyError(f"unknown tool '{name}'. Available tools: {self.names()}")
-        return self._tools[name].fn(ctx, **(args or {}))
+        result = self._tools[name].fn(ctx, **(args or {}))
+        self.calls.append((name, dict(args or {}), result))
+        return result

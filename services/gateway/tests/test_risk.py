@@ -1,3 +1,5 @@
+import json
+
 import app.main as main
 import httpx
 import pytest
@@ -5,7 +7,7 @@ from app.risk_client import RiskClient, RiskUnavailableError
 from fastapi.testclient import TestClient
 from securefin_contracts import RiskLevel, RiskScore
 
-client = TestClient(main.app)
+client = TestClient(main.app, headers={"X-Service-Token": "test-gateway-token"})  # see conftest.caller_token
 
 
 class Boom:
@@ -77,7 +79,8 @@ def test_client_sends_invoice_id():
         return httpx.Response(200, json={"score": 1, "level": "low"})
 
     _rc(handler).score(5)
-    assert seen["url"].endswith("/v1/score") and b'"invoice_id":5' in seen["body"]
+    # exactly the invoice id: an empty `features` would make the risk service skip the api and score 0
+    assert seen["url"].endswith("/v1/score") and json.loads(seen["body"]) == {"invoice_id": 5}
 
 
 @pytest.mark.parametrize("handler", [

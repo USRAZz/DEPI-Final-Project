@@ -12,6 +12,12 @@ class FakeRisk:
 
 
 @pytest.fixture(autouse=True)
+def caller_token(monkeypatch):
+    """The token test clients send in X-Service-Token (TestClient(..., headers=SERVICE_HEADERS))."""
+    monkeypatch.setenv(main.CALLER_TOKEN_ENV, "test-gateway-token")
+
+
+@pytest.fixture(autouse=True)
 def low_risk(monkeypatch):
     """Default for every test: risk service answers LOW. Tests that care override main.RISK_CLIENT."""
     monkeypatch.setattr(main, "RISK_CLIENT", FakeRisk(10))

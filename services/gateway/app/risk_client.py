@@ -18,7 +18,10 @@ class RiskClient:
 
     def score(self, invoice_id: int) -> RiskScore:
         try:
-            resp = self._client.post("/v1/score", json=RiskRequest(invoice_id=invoice_id).model_dump())
+            # Only the invoice id: the risk service then fetches the real features from the api. Sending the
+            # default `features: {}` would make it score an empty dict (always 0, LOW), even with the api down.
+            body = RiskRequest(invoice_id=invoice_id).model_dump(include={"invoice_id"})
+            resp = self._client.post("/v1/score", json=body)
             resp.raise_for_status()
             return RiskScore.model_validate_json(resp.content)
         except (httpx.HTTPError, ValidationError, ValueError) as e:

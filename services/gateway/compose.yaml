@@ -6,7 +6,7 @@ services:
       dockerfile: services/gateway/Dockerfile
     env_file: ../../.env
     ports:
-      - "8002:8000"
+      - "127.0.0.1:8002:8000"  # this machine only; the api reaches it as http://gateway:8000
     depends_on:
       - postgres
       - risk

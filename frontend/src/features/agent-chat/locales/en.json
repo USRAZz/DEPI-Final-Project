@@ -1,4 +1,24 @@
 {
   "title": "Assistant",
-  "empty": "Nothing to show yet."
+  "subtitle": "Ask about invoices, payments, alerts and policies, or ask for a report.",
+  "empty": "Ask a question to start, for example: Which invoices are flagged?",
+  "inputLabel": "Your question",
+  "placeholder": "Which invoices are flagged?",
+  "send": "Send",
+  "thinking": "Working on it…",
+  "error": "The assistant is not available right now.",
+  "readOnly": "The assistant only reads and prepares. Every payment still needs approval and passes the security gateway.",
+  "alerts.title": "Alerts in this answer",
+  "alert.invoice": "Invoice",
+  "alert.score": "({{score}}/100)",
+  "alert.why": "Why:",
+  "proposal.title": "Payment request prepared",
+  "proposal.text": "For invoice {{invoice}}:",
+  "proposal.needsApproval": "Not paid. It goes to approval and the security gateway first.",
+  "sources": "Based on:",
+  "tool.get_invoices": "invoices",
+  "tool.get_transactions": "payments",
+  "tool.get_risk_score": "risk scores",
+  "tool.search_policies": "payment policy",
+  "tool.calculate": "calculator"
 }

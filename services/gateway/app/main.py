@@ -2,7 +2,7 @@ import hmac
 import os
 from datetime import UTC, datetime
 
-from fastapi import FastAPI, Header, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException
 from pydantic import BaseModel, Field, ValidationError
 from securefin_contracts import (
     ApprovalRequest,
@@ -48,12 +48,28 @@ def _audit(action: str, company_id: int | None, user_id: int | None, decision: s
                                 tool_call=action))
 
 
+CALLER_TOKEN_ENV = "GATEWAY_SERVICE_TOKEN"
+
+
+def require_caller_token(x_service_token: str | None = Header(default=None)) -> None:
+    """Only the api may ask for decisions. The request bodies carry approver id, role and company, which the
+    gateway takes as given, so an anonymous caller could otherwise forge approvals. Not configured = closed."""
+    expected = os.environ.get(CALLER_TOKEN_ENV, "")
+    if not expected:
+        raise HTTPException(status_code=503, detail=[f"{CALLER_TOKEN_ENV} is not configured: nothing allowed"])
+    if not x_service_token or not hmac.compare_digest(x_service_token.encode(), expected.encode()):
+        raise HTTPException(status_code=401, detail=["invalid service token"])
+
+
+CallerToken = [Depends(require_caller_token)]
+
+
 @app.get("/health")
 def health():
     return {"service": "gateway", "status": "ok"}
 
 
-@app.post("/v1/authorize", response_model=GatewayDecision)
+@app.post("/v1/authorize", response_model=GatewayDecision, dependencies=CallerToken)
 def authorize(req: AuthorizeRequest) -> GatewayDecision:
     passed: list[str] = []
     # 1. Identity & role allowlist
@@ -109,7 +125,7 @@ def _signing_key() -> bytes:
         raise HTTPException(status_code=503, detail=["approval signing unavailable: nothing approved"]) from None
 
 
-@app.post("/v1/approvals/{payment_request_id}", response_model=ApprovalResult)
+@app.post("/v1/approvals/{payment_request_id}", response_model=ApprovalResult, dependencies=CallerToken)
 def approve(payment_request_id: int, req: ApprovalRequest) -> ApprovalResult:
     params = {"payment_request_id": payment_request_id, "approve": req.approve}
     try:
@@ -142,7 +158,7 @@ def _approve(payment_request_id: int, req: ApprovalRequest) -> ApprovalResult:
     return result
 
 
-@app.post("/v1/execute-check", response_model=ExecuteCheckResult)
+@app.post("/v1/execute-check", response_model=ExecuteCheckResult, dependencies=CallerToken)
 def execute_check_endpoint(req: ExecuteCheckRequest) -> ExecuteCheckResult:
     """The api calls this right before executing a payment. Anything but allowed=true means do not pay."""
     params = {"payment_request_id": req.payment_request_id}
@@ -168,7 +184,8 @@ class AuditVerifyRequest(BaseModel):
 def audit_verify(req: AuditVerifyRequest, x_service_token: str | None = Header(default=None)) -> dict:
     """Re-check one company's audit hash chain (called by the nightly n8n integrity run; read-only).
 
-    AUDIT_VERIFY_TOKEN is accepted here and nowhere else. Without it configured the endpoint is closed.
+    AUDIT_VERIFY_TOKEN is accepted here and nowhere else (the api's GATEWAY_SERVICE_TOKEN is not accepted here).
+    Without it configured the endpoint is closed.
     """
     expected = os.environ.get("AUDIT_VERIFY_TOKEN", "")
     if not expected:

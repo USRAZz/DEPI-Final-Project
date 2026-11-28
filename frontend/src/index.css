@@ -863,3 +863,26 @@ a.alert:hover {
 .shell__main > section {
   padding: 28px 32px 40px;
 }
+
+/* Print / save as PDF (reports page): the report only, on white, without the app shell. */
+@media print {
+  .sidebar,
+  .topbar,
+  .no-print {
+    display: none !important;
+  }
+  .shell,
+  .shell__main,
+  .page {
+    display: block;
+    margin: 0;
+    padding: 0;
+  }
+  body {
+    background: #fff;
+  }
+  .card {
+    break-inside: avoid;
+    box-shadow: none;
+  }
+}

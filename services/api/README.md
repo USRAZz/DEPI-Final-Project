@@ -33,6 +33,14 @@ The frontend reaches these under `/api`; the dev proxy removes that prefix.
 | POST | `/payment-requests/{id}/execute` | Simulated payment, only if the gateway's execute-check allows |
 | GET | `/vendors/{id}/bank-change` | Current and proposed bank account |
 | GET | `/payments/{id}` | Internal, for the gateway: `PaymentRequestInfo`. Needs `X-Service-Token` |
+| GET | `/invoices` | Company invoices, newest first; `status`, `vendor_name`, `date_from`, `date_to`, `limit` (≤200). The assistant's `get_invoices` tool (`app/assistant.py`) |
+| GET | `/transactions` | Paid (simulated) payment requests; `date_from`, `date_to`. Date = the request's date (no paid-at column yet) |
+| GET | `/invoices/{id}/risk` | Stored risk score of the invoice's payment request; `scored: false` when none |
+| POST | `/chat` | `ChatRequest` → `ChatResponse`, forwarded to the agent with the session's user id and role |
+| POST | `/reports` | `ReportRequest` → `Report`, forwarded to the agent the same way |
+
+Execution re-checks the request's status under a lock (`mark_paid`), so two concurrent executes never both pay (the
+second gets 409), and a payment request's bank account must be verified **and** belong to the request's vendor.
 
 ## Calls to services/gateway
 

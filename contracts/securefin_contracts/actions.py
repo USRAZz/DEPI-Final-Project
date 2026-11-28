@@ -5,6 +5,9 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from .common import RiskLevel
+from .risk import RiskReason
+
 
 class ToolName(str, Enum):
     GET_INVOICES = "get_invoices"
@@ -32,11 +35,33 @@ class ProposedAction(BaseModel):
     rationale: str = Field(default="", max_length=1000)
 
 
+class ChatTurn(BaseModel):
+    """One earlier message of the same conversation, oldest first. The agent reads it as context only (data)."""
+
+    role: Literal["user", "assistant"]
+    content: str = Field(max_length=4000)
+
+
 class ChatRequest(BaseModel):
     message: str = Field(max_length=4000)
     mode: Literal["normal", "dry_run"] = "normal"
+    history: list[ChatTurn] = Field(default_factory=list, max_length=20)  # chat memory; empty = new conversation
+
+
+class InvoiceAlert(BaseModel):
+    """An invoice the assistant looked at that has a problem, with WHY, built by code from the data (never the LLM)."""
+
+    invoice_id: int
+    invoice_number: str | None = None
+    vendor: str | None = None
+    status: str | None = None          # e.g. FLAGGED
+    level: RiskLevel | None = None     # from the risk service, when it was scored
+    score: float | None = Field(default=None, ge=0, le=100)
+    reasons: list[RiskReason] = Field(default_factory=list)  # rule hits + extraction issues, in plain words
 
 
 class ChatResponse(BaseModel):
     answer: str
     proposed_actions: list[ProposedAction] = Field(default_factory=list)
+    alerts: list[InvoiceAlert] = Field(default_factory=list)  # every flagged / risky invoice used, with its reasons
+    sources: list[str] = Field(default_factory=list)          # read-only tools the answer is based on

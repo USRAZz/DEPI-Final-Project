@@ -37,7 +37,7 @@ from .db import (
     VendorRow,
 )
 from .models import PaymentRecord
-from .store import ApprovalEntry, Store
+from .store import ApprovalEntry, PaymentStateConflict, Store
 
 
 def _utc(value):
@@ -190,10 +190,24 @@ class SqlStore:
         """PAID_SIMULATED and one more payment to that account, in one transaction."""
         with self._session.begin() as s:
             row = s.get(PaymentRequestRow, request_id, with_for_update=True)
+            # Re-checked under the row lock: a second, concurrent execute waits here and then finds it paid.
+            if row is None or row.status != InvoiceStatus.PENDING_APPROVAL.value:
+                raise PaymentStateConflict(request_id)
             row.status = InvoiceStatus.PAID_SIMULATED.value
             s.execute(update(BankAccountRow).where(BankAccountRow.id == row.bank_account_id)
                       .values(times_paid=BankAccountRow.times_paid + 1))
             return _payment(row)
+
+    def company_invoices(self, company_id: int) -> list[Invoice]:
+        with self._tenant(company_id) as s:
+            rows = s.scalars(select(InvoiceRow).where(InvoiceRow.company_id == company_id).order_by(InvoiceRow.id))
+            return [_invoice(r) for r in rows]
+
+    def company_requests(self, company_id: int) -> list[PaymentRecord]:
+        with self._tenant(company_id) as s:
+            rows = s.scalars(select(PaymentRequestRow).where(PaymentRequestRow.company_id == company_id)
+                             .order_by(PaymentRequestRow.id))
+            return [_payment(r) for r in rows]
 
     def set_account_status(self, account_id: int, status: BankAccountStatus) -> None:
         with self._session.begin() as s:

@@ -6,7 +6,7 @@ client = TestClient(app)
 
 
 def score(**features):
-    resp = client.post("/v1/score", json={"invoice_id": 1, "features": features})
+    resp = client.post("/v1/score", json={"features": features})  # no invoice_id: score exactly these features
     assert resp.status_code == 200
     return resp.json()
 

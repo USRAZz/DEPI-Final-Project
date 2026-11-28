@@ -35,7 +35,7 @@ from .schemas import (
     PaymentRequestView,
     PendingRow,
 )
-from .store import DataStore
+from .store import DataStore, PaymentStateConflict
 
 router = APIRouter()
 
@@ -59,10 +59,13 @@ def _account_view(store: DataStore, account: BankAccount) -> AccountView:
 
 
 def _verified_account(store: DataStore, request: PaymentRecord) -> BankAccount:
-    # The account must still be verified: the payment goes to this exact account.
+    # The account must still be verified AND belong to the request's vendor: the payment goes to this exact account.
+    # (A verified account of another vendor in the same company is refused, the IBAN-swap case.)
     account = store.bank_account(request.bank_account_id, request.company_id)
     if account is None or account.status != BankAccountStatus.VERIFIED:
         raise HTTPException(status.HTTP_409_CONFLICT, "bank account is not verified")
+    if account.vendor_id != request.vendor_id:
+        raise HTTPException(status.HTTP_409_CONFLICT, "bank account does not belong to this vendor")
     return account
 
 
@@ -212,7 +215,11 @@ def execute_payment_request(request_id: int, user: UserDep, store: StoreDep, gat
     if not result.allowed:
         raise HTTPException(status.HTTP_409_CONFLICT, result.reasons or ["gateway did not allow execution"])
 
-    return ExecutionView(request=store.mark_paid(request.id), executed=True)
+    try:
+        paid = store.mark_paid(request.id)  # re-checks the status under a lock: two executes never both pay
+    except PaymentStateConflict:
+        raise HTTPException(status.HTTP_409_CONFLICT, ["request was already paid or changed: nothing was paid"]) from None
+    return ExecutionView(request=paid, executed=True)
 
 
 @router.get("/vendors/{vendor_id}/bank-change")
