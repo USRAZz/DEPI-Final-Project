@@ -18,12 +18,17 @@ class PaymentNotFoundError(LookupError):
 
 
 class PaymentsClient:
-    def __init__(self, base_url: str, timeout_s: float, transport: httpx.BaseTransport | None = None):
+    """The api's GET /payments/{id} is service-to-service: it needs INTERNAL_SERVICE_TOKEN in X-Service-Token."""
+
+    def __init__(self, base_url: str, token: str, timeout_s: float, transport: httpx.BaseTransport | None = None):
+        self._token = token
         self._client = httpx.Client(base_url=base_url, timeout=timeout_s, transport=transport)
 
     def get(self, payment_request_id: int) -> PaymentRequestInfo:
+        if not self._token:  # the api would answer 401 anyway; say why instead
+            raise PaymentsUnavailableError("INTERNAL_SERVICE_TOKEN is not set")
         try:
-            resp = self._client.get(f"/payments/{payment_request_id}")
+            resp = self._client.get(f"/payments/{payment_request_id}", headers={"X-Service-Token": self._token})
             if resp.status_code == 404:
                 raise PaymentNotFoundError(payment_request_id)
             resp.raise_for_status()
@@ -38,4 +43,5 @@ class PaymentsClient:
 
 
 def build_payments_client(timeout_ms: int) -> PaymentsClient:
-    return PaymentsClient(os.environ.get("API_URL", DEFAULT_API_URL), timeout_ms / 1000)
+    return PaymentsClient(os.environ.get("API_URL", DEFAULT_API_URL), os.environ.get("INTERNAL_SERVICE_TOKEN", ""),
+                          timeout_ms / 1000)

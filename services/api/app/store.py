@@ -7,6 +7,7 @@ company is "not found", never "forbidden", so its existence does not leak.
 """
 
 import hashlib
+import threading
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
@@ -47,6 +48,10 @@ def _at(iso: str) -> datetime:
     return datetime.fromisoformat(iso).replace(tzinfo=UTC)
 
 
+class PaymentStateConflict(Exception):  # noqa: N818  (a business outcome)
+    """The payment request is no longer awaiting execution (for example a second, concurrent execute)."""
+
+
 @dataclass(frozen=True)
 class ApprovalEntry:
     approver_id: int
@@ -73,8 +78,10 @@ class DataStore(Protocol):
     def approval_result(self, request_id: int) -> ApprovalResult | None: ...
     def set_request_status(self, request_id: int, status: InvoiceStatus) -> None: ...
     def record_approval(self, approver_id: int, approve: bool, result: ApprovalResult) -> None: ...
-    def mark_paid(self, request_id: int) -> PaymentRecord: ...
+    def mark_paid(self, request_id: int) -> PaymentRecord: ...  # raises PaymentStateConflict unless still pending
     def set_account_status(self, account_id: int, status: BankAccountStatus) -> None: ...
+    def company_invoices(self, company_id: int) -> list[Invoice]: ...
+    def company_requests(self, company_id: int) -> list[PaymentRecord]: ...
 
 
 @dataclass
@@ -91,6 +98,7 @@ class Store:
     # What the gateway answered, kept for the screens: the gateway has no read endpoint for approvals.
     approval_entries: dict[int, list[ApprovalEntry]] = field(default_factory=dict)
     approval_results: dict[int, ApprovalResult] = field(default_factory=dict)
+    _pay_lock: threading.Lock = field(default_factory=threading.Lock, repr=False, compare=False)
 
     # -- reads -----------------------------------------------------------------
 
@@ -163,11 +171,21 @@ class Store:
         self.approval_results[result.payment_request_id] = result
 
     def mark_paid(self, request_id: int) -> PaymentRecord:
-        """PAID_SIMULATED, and one more payment to that bank account."""
-        self.set_request_status(request_id, InvoiceStatus.PAID_SIMULATED)
-        request = self.payment_requests[request_id]
-        self.paid_counts[request.bank_account_id] = self.times_paid(request.bank_account_id) + 1
-        return request
+        """PAID_SIMULATED, and one more payment to that bank account. Checked and set under one lock, so two
+        concurrent executes cannot both pay."""
+        with self._pay_lock:
+            if self.payment_requests[request_id].status != InvoiceStatus.PENDING_APPROVAL:
+                raise PaymentStateConflict(request_id)
+            self.set_request_status(request_id, InvoiceStatus.PAID_SIMULATED)
+            request = self.payment_requests[request_id]
+            self.paid_counts[request.bank_account_id] = self.times_paid(request.bank_account_id) + 1
+            return request
+
+    def company_invoices(self, company_id: int) -> list[Invoice]:
+        return sorted((i for i in self.invoices.values() if i.company_id == company_id), key=lambda i: i.id)
+
+    def company_requests(self, company_id: int) -> list[PaymentRecord]:
+        return sorted((p for p in self.payment_requests.values() if p.company_id == company_id), key=lambda p: p.id)
 
     def set_account_status(self, account_id: int, status: BankAccountStatus) -> None:
         self.bank_accounts[account_id] = self.bank_accounts[account_id].model_copy(update={"status": status})

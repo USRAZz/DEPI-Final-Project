@@ -7,6 +7,8 @@ import re
 import time
 from pathlib import Path
 
+from ai_core.injection import CODE as INJECTION_CODE
+from ai_core.injection import find_instructions
 from ai_core.llm import Budget, BudgetExceeded, StructuredOutputError, get_llm
 from ai_core.privacy import find_ibans, find_tax_ids, mask_sensitive
 from ai_core.prompts import load_prompt, untrusted
@@ -34,6 +36,7 @@ ISSUE_MESSAGES = {
     "LOW_CATEGORY_CONFIDENCE": "low-confidence category",
     "CATEGORIZATION_FAILED": "categorization failed",
     "POSSIBLE_DUPLICATE": "possible duplicate",
+    INJECTION_CODE: "the document contains instructions aimed at the AI or the approval process",
 }
 
 
@@ -85,6 +88,8 @@ def process_invoice(path, *, invoice_id: str | None = None, llm_extract=None, ll
 
     # IBAN and tax id are read by code and masked out of the text: they never reach the LLM provider.
     ibans, tax_ids = find_ibans(text), find_tax_ids(text)
+    # Instructions hidden in the document are found by code, before and whatever the LLM reads (ai_core/injection).
+    injected = find_instructions(text)
 
     # 2) LLM 1: the ONLY step that sees the (masked) OCR text. No tools; JSON only.
     llm_extract = llm_extract or get_llm("extractor")
@@ -94,13 +99,17 @@ def process_invoice(path, *, invoice_id: str | None = None, llm_extract=None, ll
                                          {"role": "user", "content": untrusted(mask_sensitive(text))}],
                                         InvoiceFields, budget=budget)
     except (StructuredOutputError, BudgetExceeded) as e:
-        return result("FAILED", issues=[f"extraction failed: {e}"], ocr_chars=len(text))
+        codes = [INJECTION_CODE] if injected else []
+        return result("FAILED", issues=[f"extraction failed: {e}"] + [ISSUE_MESSAGES[c] for c in codes],
+                      issue_codes=codes, ocr_chars=len(text))
 
     fields = fields.model_copy(update={"iban": ibans[0] if ibans else None,
                                        "tax_id": tax_ids[0] if tax_ids else None})
 
     # 3) GATE 1: checks in code
     codes = check_field_codes(fields)
+    if injected:
+        codes.append(INJECTION_CODE)
     issues = [ISSUE_MESSAGES[c] for c in codes]
 
     # 4) LLM 2: sees only the validated fields, never the raw text

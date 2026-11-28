@@ -1,5 +1,6 @@
 """Routing: classify the user's request into one route (a single small LLM call)."""
 import logging
+import re
 from datetime import date
 from enum import Enum
 
@@ -9,6 +10,16 @@ from ai_core.llm import get_llm
 from ai_core.prompts import load_prompt, untrusted
 
 log = logging.getLogger(__name__)
+
+_ARABIC = re.compile(r"[\u0600-\u06FF]")
+
+
+def detect_language(text: str) -> str:
+    """"ar" when at least 30% of the letters are Arabic, else "en". Code is more reliable than a small model here."""
+    letters = [c for c in text if c.isalpha()]
+    arabic = sum(1 for c in letters if _ARABIC.match(c))
+    return "ar" if letters and arabic / len(letters) >= 0.3 else "en"
+
 
 class Route(str, Enum):
     invoice_upload = "invoice_upload"
@@ -38,9 +49,14 @@ class RouteDecision(BaseModel):
     clarifying_question: str | None = None
 
 
-def route_request(message: str, *, has_attachment: bool = False, llm=None, min_confidence: float = 0.6) -> RouteDecision:
+def route_request(message: str, *, has_attachment: bool = False, llm=None, min_confidence: float = 0.6,
+                  context: str | None = None) -> RouteDecision:
+    """context = the last exchange of the conversation, so "yes, pay it" can be routed. The language is always
+    detected from the new message alone."""
     if has_attachment and not message.strip():  # a file with no text is always an invoice: no LLM call needed
         return RouteDecision(route=Route.invoice_upload, confidence=1.0)
+    if not message.strip():  # nothing to classify: do not spend an LLM call
+        return RouteDecision(route=Route.unclear, confidence=1.0, clarifying_question=FALLBACK_QUESTION)
 
     llm = llm or get_llm("router")
     system = load_prompt(
@@ -49,13 +65,15 @@ def route_request(message: str, *, has_attachment: bool = False, llm=None, min_c
         has_attachment=str(has_attachment).lower(),
         today=date.today().isoformat(),
     )
+    text = message if not context else f"Earlier in this conversation:\n{context}\n\nNew message to classify:\n{message}"
     try:
         d = llm.structured([{"role": "system", "content": system},
-                            {"role": "user", "content": untrusted(message)}], RouteDecision)
+                            {"role": "user", "content": untrusted(text)}], RouteDecision)
     except Exception as e:  # provider down, bad JSON twice, ...: never guess, ask the user
         log.warning("router LLM call failed: %s: %s", type(e).__name__, e)
         return RouteDecision(route=Route.unclear, confidence=0.0, clarifying_question=FALLBACK_QUESTION)
-    
+
+    d = d.model_copy(update={"language": detect_language(message)})
     if d.route != Route.unclear and d.confidence < min_confidence:
         d = d.model_copy(update={"route": Route.unclear})
     if d.route == Route.unclear and not d.clarifying_question:

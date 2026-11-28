@@ -4,6 +4,8 @@ from decimal import Decimal, InvalidOperation
 from pydantic import ValidationError
 from securefin_contracts import ExtractResponse, InvoiceData, InvoiceStatus, LineItem
 
+from ai_core.injection import CODE as INJECTION_CODE
+
 from .schemas import ExtractionResult, InvoiceFields
 
 _STATUS = {"READY": InvoiceStatus.VALIDATED, "FLAGGED": InvoiceStatus.FLAGGED, "FAILED": InvoiceStatus.NEEDS_REVIEW}
@@ -47,5 +49,7 @@ def to_response(r: ExtractionResult) -> ExtractResponse:
         except (ValidationError, ValueError):
             codes.append("SCHEMA_INVALID")
     status = _STATUS[r.status] if data is not None or r.status == "FAILED" else InvoiceStatus.NEEDS_REVIEW
+    if INJECTION_CODE in codes:  # hidden instructions: a person reads this invoice before anything uses it
+        status = InvoiceStatus.NEEDS_REVIEW
     return ExtractResponse(status=status, data=data, issue_codes=codes[:20], ocr_confidence=r.ocr_confidence,
                            category=r.category.category if r.category else None)

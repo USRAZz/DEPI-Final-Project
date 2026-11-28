@@ -2,7 +2,7 @@ import pytest
 from app.main import app
 from fastapi.testclient import TestClient
 
-client = TestClient(app)
+client = TestClient(app, headers={"X-Service-Token": "test-gateway-token"})  # see conftest.caller_token
 
 
 def _pay(role="accountant", amount="500", currency=None):

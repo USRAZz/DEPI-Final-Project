@@ -60,3 +60,27 @@ def test_execute_check_reads_allowed():
     gw = gateway_answering(lambda r: httpx.Response(200, json={"allowed": False, "reasons": ["rejected"]}))
     result = gw.execute_check(CHECK)
     assert result.allowed is False and result.reasons == ["rejected"]
+
+
+def test_sends_the_service_token_on_every_call():
+    seen = []
+
+    def handler(request: httpx.Request):
+        seen.append(request.headers.get("X-Service-Token"))
+        body = RESULT if request.url.path.startswith("/v1/approvals") else {"allowed": True, "reasons": []}
+        return httpx.Response(200, json=body)
+
+    gw = HttpGateway("http://gateway", transport=httpx.MockTransport(handler), token="gw-secret")
+    gw.submit_approval(APPROVAL)
+    gw.execute_check(CHECK)
+    assert seen == ["gw-secret", "gw-secret"]
+
+
+@pytest.mark.parametrize("code", [401, 503])
+def test_token_refused_or_unconfigured_is_unavailable(code):
+    # 401 is not one of the gateway's decisions: nothing was approved and nothing may be paid
+    gw = gateway_answering(lambda r: httpx.Response(code, json={"detail": ["invalid service token"]}))
+    with pytest.raises(GatewayUnavailable):
+        gw.submit_approval(APPROVAL)
+    with pytest.raises(GatewayUnavailable):
+        gw.execute_check(CHECK)

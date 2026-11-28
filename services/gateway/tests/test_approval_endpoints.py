@@ -8,7 +8,7 @@ from app.stores import InMemoryApprovalStore
 from fastapi.testclient import TestClient
 from securefin_contracts import InvoiceStatus, PaymentRequestInfo
 
-client = TestClient(main.app)
+client = TestClient(main.app, headers={"X-Service-Token": "test-gateway-token"})  # see conftest.caller_token
 
 
 def make_payment(**kw) -> PaymentRequestInfo:

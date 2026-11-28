@@ -56,6 +56,13 @@ def test_api_unavailable_returns_503_never_a_low_score(fake):
     assert resp.status_code == 503 and "unavailable" in resp.json()["detail"]
 
 
+def test_empty_features_with_invoice_id_still_fetch_and_fail_closed(fake):
+    # The gateway used to send {"invoice_id": n, "features": {}}: that must not score 0 without asking the api.
+    f = fake(fail=True)
+    resp = client.post("/v1/score", json={"invoice_id": 4, "features": {}})
+    assert f.calls == [4] and resp.status_code == 503
+
+
 def test_explicit_features_skip_the_api(fake):
     f = fake(fail=True)
     r = client.post("/v1/score", json={"invoice_id": 1, "features": {"bank_account_mismatch": True}}).json()

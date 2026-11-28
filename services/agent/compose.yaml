@@ -6,4 +6,4 @@ services:
       dockerfile: services/agent/Dockerfile
     env_file: ../../.env
     ports:
-      - "8001:8000"
+      - "127.0.0.1:8001:8000"  # this machine only: the agent trusts X-User-Id, the api reaches it as http://agent:8000

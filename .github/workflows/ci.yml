@@ -30,6 +30,20 @@ jobs:
       - run: ruff check services/${{ matrix.service }}
       - run: cd services/${{ matrix.service }} && pytest -q
 
+  ai:
+    # The AI part across services (owner: Yousra): ai_core, prompt-injection guard, report writer, Jev routing and the
+    # AI evaluation's case files and scoring (eval/ai_eval). Offline: scripted fake LLMs, no key, no cost.
+    # The real-LLM evaluation is `python eval/ai_eval/run_ai_eval.py` (needs a key; run it when prompts change).
+    needs: contracts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install ./contracts -r services/agent/requirements-dev.txt -r services/extractor/requirements-dev.txt -r services/api/requirements-dev.txt
+      - run: ruff check ai_core eval/ai_eval tests
+      - run: python -m pytest -q tests
+
   migrations:
     runs-on: ubuntu-latest
     steps:

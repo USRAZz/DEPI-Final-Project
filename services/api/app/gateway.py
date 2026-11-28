@@ -12,7 +12,8 @@ import httpx
 from pydantic import ValidationError
 from securefin_contracts import ApprovalRequest, ApprovalResult, ExecuteCheckRequest, ExecuteCheckResult
 
-DEFAULT_GATEWAY_URL = "http://gateway:8000"  # docker service name; use http://localhost:8001 outside Docker
+DEFAULT_GATEWAY_URL = "http://gateway:8000"  # docker service name; use http://localhost:8002 outside Docker
+TOKEN_ENV = "GATEWAY_SERVICE_TOKEN"  # sent in X-Service-Token; the gateway answers 401/503 without it (= unavailable)
 DEFAULT_TIMEOUT_S = 5.0
 
 # Status codes on which the gateway answered on purpose, with reasons in `detail`.
@@ -46,8 +47,10 @@ def _reasons(resp: httpx.Response) -> list[str]:
 
 
 class HttpGateway:
-    def __init__(self, base_url: str, timeout_s: float = DEFAULT_TIMEOUT_S, transport: httpx.BaseTransport | None = None):
-        self._client = httpx.Client(base_url=base_url, timeout=timeout_s, transport=transport)
+    def __init__(self, base_url: str, timeout_s: float = DEFAULT_TIMEOUT_S, transport: httpx.BaseTransport | None = None,
+                 token: str = ""):
+        headers = {"X-Service-Token": token} if token else {}
+        self._client = httpx.Client(base_url=base_url, timeout=timeout_s, transport=transport, headers=headers)
 
     def _post(self, path: str, body, result_type):
         try:
@@ -72,4 +75,5 @@ class HttpGateway:
 
 def build_gateway() -> HttpGateway:
     timeout_s = float(os.environ.get("GATEWAY_TIMEOUT_MS", DEFAULT_TIMEOUT_S * 1000)) / 1000
-    return HttpGateway(os.environ.get("GATEWAY_URL", DEFAULT_GATEWAY_URL), timeout_s)
+    return HttpGateway(os.environ.get("GATEWAY_URL", DEFAULT_GATEWAY_URL), timeout_s,
+                       token=os.environ.get(TOKEN_ENV, ""))

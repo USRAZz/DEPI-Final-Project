@@ -67,15 +67,17 @@ def test_mask_messages_covers_text_parts_and_keeps_images():
 
 
 def test_supported_providers(monkeypatch):
-    assert list(PROVIDERS) == ["openai", "openrouter"]
-
+    # Decision updated 28/11 (Yousra): free tiers of OpenAI, OpenRouter and Groq. Anything else is refused.
+    assert list(PROVIDERS) == ["openai", "openrouter", "groq"]
     monkeypatch.setenv("GROQ_API_KEY", "x")
+    assert LLM("groq", "m").client.base_url.host == "api.groq.com"
+
     try:
-        LLM("groq", "m")
+        LLM("ollama", "m")
     except ValueError as e:
         assert "unknown provider" in str(e)
     else:
-        raise AssertionError("groq must be rejected")
+        raise AssertionError("an unapproved provider must be rejected")
 
 
 

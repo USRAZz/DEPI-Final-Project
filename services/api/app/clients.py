@@ -13,8 +13,10 @@ async def gateway_authorize(req: AuthorizeRequest) -> GatewayDecision:
     if not GATEWAY_ENABLED:
         return GatewayDecision(decision=Decision.ALLOW, reasons=["gateway disabled (baseline eval mode)"])
     try:
+        token = os.getenv("GATEWAY_SERVICE_TOKEN", "")  # without it the gateway answers 401 -> BLOCK below
         async with httpx.AsyncClient(timeout=5) as client:
-            r = await client.post(f"{GATEWAY_URL}/v1/authorize", json=req.model_dump(mode="json"))
+            r = await client.post(f"{GATEWAY_URL}/v1/authorize", json=req.model_dump(mode="json"),
+                                  headers={"X-Service-Token": token} if token else {})
             r.raise_for_status()
             return GatewayDecision.model_validate(r.json())
     except Exception as exc:  # noqa: BLE001 — fail closed on purpose
